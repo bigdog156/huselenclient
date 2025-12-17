@@ -353,10 +353,11 @@ struct CheckInView: View {
         let imageSize = originalImage.size
         let scale = originalImage.scale
         
-        UIGraphicsBeginImageContextWithOptions(imageSize, false, scale)
+        // Use scale 1.0 to avoid double-scaling issues
+        UIGraphicsBeginImageContextWithOptions(imageSize, false, 1.0)
         
         // Draw original image
-        originalImage.draw(at: .zero)
+        originalImage.draw(in: CGRect(origin: .zero, size: imageSize))
         
         // Get context
         guard let context = UIGraphicsGetCurrentContext() else {
@@ -364,11 +365,24 @@ struct CheckInView: View {
             return originalImage
         }
         
-        // Draw gradient overlay at bottom
-        let gradientHeight: CGFloat = imageSize.height * 0.5
-        let gradientRect = CGRect(x: 0, y: imageSize.height - gradientHeight, width: imageSize.width, height: gradientHeight)
+        // Calculate base scale factor relative to a reference height (like iPhone screen ~800pt)
+        // This ensures consistent overlay sizing regardless of image resolution
+        let referenceHeight: CGFloat = 800
+        let scaleFactor = imageSize.height / referenceHeight
         
-        let colors = [UIColor.black.withAlphaComponent(0).cgColor, UIColor.black.withAlphaComponent(0.7).cgColor]
+        // Draw gradient overlay at bottom (same ratio as SwiftUI: 450/screenHeight)
+        let gradientHeight: CGFloat = 450 * scaleFactor
+        let gradientRect = CGRect(
+            x: 0,
+            y: imageSize.height - gradientHeight,
+            width: imageSize.width,
+            height: gradientHeight
+        )
+        
+        let colors = [
+            UIColor.black.withAlphaComponent(0).cgColor,
+            UIColor.black.withAlphaComponent(0.7).cgColor
+        ]
         let colorSpace = CGColorSpaceCreateDeviceRGB()
         let locations: [CGFloat] = [0.0, 1.0]
         
@@ -381,68 +395,94 @@ struct CheckInView: View {
             )
         }
         
-        // Calculate positions (centered)
+        // Calculate positions to match SwiftUI overlay
+        // SwiftUI uses .padding(.bottom, 180) from bottom
         let centerX = imageSize.width / 2
-        let bottomY = imageSize.height - (imageSize.height * 0.15)
+        let bottomPadding: CGFloat = 180 * scaleFactor
+        let contentBottomY = imageSize.height - bottomPadding
         
-        // Draw session badge
-        let badgeText = "🏋️ BUỔI TẬP #\(sessionNumber)"
-        let badgeFont = UIFont.systemFont(ofSize: imageSize.width * 0.035, weight: .bold)
-        let badgeAttributes: [NSAttributedString.Key: Any] = [
-            .font: badgeFont,
-            .foregroundColor: UIColor.white
-        ]
-        let badgeSize = (badgeText as NSString).size(withAttributes: badgeAttributes)
-        let badgeRect = CGRect(
-            x: centerX - badgeSize.width / 2 - 20,
-            y: bottomY - 180 - badgeSize.height / 2,
-            width: badgeSize.width + 40,
-            height: badgeSize.height + 16
-        )
+        // Font sizes scaled proportionally
+        let timeFontSize: CGFloat = 72 * scaleFactor
+        let dateFontSize: CGFloat = 20 * scaleFactor
+        let badgeFontSize: CGFloat = 14 * scaleFactor
         
-        // Badge background
-        let badgePath = UIBezierPath(roundedRect: badgeRect, cornerRadius: badgeRect.height / 2)
-        UIColor.white.withAlphaComponent(0.25).setFill()
-        badgePath.fill()
+        // Spacing between elements (matching SwiftUI VStack spacing: 16)
+        let spacing: CGFloat = 16 * scaleFactor
         
-        // Badge text
-        let badgeTextRect = CGRect(
-            x: centerX - badgeSize.width / 2,
-            y: bottomY - 180 - badgeSize.height / 2 + 8,
-            width: badgeSize.width,
-            height: badgeSize.height
-        )
-        (badgeText as NSString).draw(in: badgeTextRect, withAttributes: badgeAttributes)
-        
-        // Draw time
-        let timeFont = UIFont.systemFont(ofSize: imageSize.width * 0.15, weight: .bold)
-        let timeAttributes: [NSAttributedString.Key: Any] = [
-            .font: timeFont,
-            .foregroundColor: UIColor.white
-        ]
-        let timeSize = (currentTime as NSString).size(withAttributes: timeAttributes)
-        let timeRect = CGRect(
-            x: centerX - timeSize.width / 2,
-            y: bottomY - 120,
-            width: timeSize.width,
-            height: timeSize.height
-        )
-        (currentTime as NSString).draw(in: timeRect, withAttributes: timeAttributes)
-        
-        // Draw date
-        let dateFont = UIFont.systemFont(ofSize: imageSize.width * 0.045, weight: .medium)
+        // Draw date (bottom element)
+        let dateFont = UIFont.systemFont(ofSize: dateFontSize, weight: .medium)
         let dateAttributes: [NSAttributedString.Key: Any] = [
             .font: dateFont,
             .foregroundColor: UIColor.white
         ]
         let dateSize = (currentDate as NSString).size(withAttributes: dateAttributes)
+        let dateY = contentBottomY - dateSize.height
         let dateRect = CGRect(
             x: centerX - dateSize.width / 2,
-            y: bottomY - 20,
+            y: dateY,
             width: dateSize.width,
             height: dateSize.height
         )
         (currentDate as NSString).draw(in: dateRect, withAttributes: dateAttributes)
+        
+        // Draw time (above date)
+        let timeFont = UIFont.systemFont(ofSize: timeFontSize, weight: .bold)
+        let timeAttributes: [NSAttributedString.Key: Any] = [
+            .font: timeFont,
+            .foregroundColor: UIColor.white
+        ]
+        let timeSize = (currentTime as NSString).size(withAttributes: timeAttributes)
+        let timeY = dateY - spacing - timeSize.height
+        let timeRect = CGRect(
+            x: centerX - timeSize.width / 2,
+            y: timeY,
+            width: timeSize.width,
+            height: timeSize.height
+        )
+        (currentTime as NSString).draw(in: timeRect, withAttributes: timeAttributes)
+        
+        // Draw session badge (above time)
+        let badgeText = "🏋️ BUỔI TẬP #\(sessionNumber)"
+        let badgeFont = UIFont.systemFont(ofSize: badgeFontSize, weight: .bold)
+        let badgeAttributes: [NSAttributedString.Key: Any] = [
+            .font: badgeFont,
+            .foregroundColor: UIColor.white
+        ]
+        let badgeTextSize = (badgeText as NSString).size(withAttributes: badgeAttributes)
+        
+        // Badge padding (matching SwiftUI: horizontal 16, vertical 10)
+        let badgePaddingH: CGFloat = 16 * scaleFactor
+        let badgePaddingV: CGFloat = 10 * scaleFactor
+        
+        let badgeWidth = badgeTextSize.width + badgePaddingH * 2
+        let badgeHeight = badgeTextSize.height + badgePaddingV * 2
+        let badgeY = timeY - spacing - badgeHeight
+        
+        let badgeRect = CGRect(
+            x: centerX - badgeWidth / 2,
+            y: badgeY,
+            width: badgeWidth,
+            height: badgeHeight
+        )
+        
+        // Badge background (capsule shape)
+        let badgePath = UIBezierPath(roundedRect: badgeRect, cornerRadius: badgeHeight / 2)
+        UIColor.white.withAlphaComponent(0.2).setFill()
+        badgePath.fill()
+        
+        // Badge border
+        UIColor.white.withAlphaComponent(0.3).setStroke()
+        badgePath.lineWidth = 1 * scaleFactor
+        badgePath.stroke()
+        
+        // Badge text (centered in badge)
+        let badgeTextRect = CGRect(
+            x: centerX - badgeTextSize.width / 2,
+            y: badgeY + badgePaddingV,
+            width: badgeTextSize.width,
+            height: badgeTextSize.height
+        )
+        (badgeText as NSString).draw(in: badgeTextRect, withAttributes: badgeAttributes)
         
         let resultImage = UIGraphicsGetImageFromCurrentImageContext() ?? originalImage
         UIGraphicsEndImageContext()

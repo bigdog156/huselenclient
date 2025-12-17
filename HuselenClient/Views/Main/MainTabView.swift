@@ -8,75 +8,150 @@
 import SwiftUI
 
 enum MainTab: String, CaseIterable {
-    case today = "Hôm nay"
-    case journal = "Nhật ký"
-    case profile = "Hồ sơ"
+    case workout = "Tập luyện"
+    case meal = "Ăn uống"
+    case weight = "Cân nặng"
+    case profile = "Cá nhân"
     
     var icon: String {
         switch self {
-        case .today: return "calendar"
-        case .journal: return "book"
+        case .workout: return "figure.strengthtraining.traditional"
+        case .meal: return "fork.knife"
+        case .weight: return "scalemass"
         case .profile: return "person"
         }
     }
     
     var selectedIcon: String {
         switch self {
-        case .today: return "calendar.badge.clock"
-        case .journal: return "book.fill"
+        case .workout: return "figure.strengthtraining.traditional"
+        case .meal: return "fork.knife"
+        case .weight: return "scalemass.fill"
         case .profile: return "person.fill"
         }
+    }
+    
+    // Tabs on left side of center button
+    static var leftTabs: [MainTab] {
+        [.workout, .meal]
+    }
+    
+    // Tabs on right side of center button
+    static var rightTabs: [MainTab] {
+        [.weight, .profile]
     }
 }
 
 struct MainTabView: View {
     @ObservedObject var authViewModel: AuthViewModel
-    @State private var selectedTab: MainTab = .today
-    @ObservedObject var profileViewModel = ProfileViewModel()
+    @State private var selectedTab: MainTab = .workout
+    @StateObject var profileViewModel = ProfileViewModel()
+    @State private var showCheckIn = false
+    
+    private var userId: String {
+        authViewModel.currentUser?.id.uuidString.lowercased() ?? ""
+    }
+    
     var body: some View {
-        VStack(spacing: 0) {
-            // Content
-            Group {
-                switch selectedTab {
-                case .today:
-                    HomeView(authViewModel: authViewModel)
-                case .journal:
-                    JournalView()
-                case .profile:
-                    ProfileView(authViewModel: authViewModel)
+        ZStack {
+            VStack(spacing: 0) {
+                // Content
+                Group {
+                    switch selectedTab {
+                    case .workout:
+                        HomeView(authViewModel: authViewModel)
+                    case .meal:
+                        MealLogView(userId: userId)
+                    case .weight:
+                        WeightTrackingView(userId: userId)
+                    case .profile:
+                        ProfileView(authViewModel: authViewModel)
+                    }
                 }
+                .environmentObject(profileViewModel)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                
+                // Custom Tab Bar
+                customTabBar
             }
-            .environmentObject(profileViewModel)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            
-            // Custom Tab Bar
-            customTabBar
+            .ignoresSafeArea(.keyboard, edges: .bottom)
         }
-        .ignoresSafeArea(.keyboard, edges: .bottom)
+        .fullScreenCover(isPresented: $showCheckIn) {
+            CheckInView(
+                userId: userId,
+                workoutId: nil,
+                onCheckInComplete: {
+                    // Refresh data if needed
+                }
+            )
+        }
     }
     
     // MARK: - Custom Tab Bar
     private var customTabBar: some View {
-        HStack(spacing: 0) {
-            ForEach(MainTab.allCases, id: \.self) { tab in
-                TabBarButton(
-                    tab: tab,
-                    isSelected: selectedTab == tab
-                ) {
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        selectedTab = tab
-                    }
-                }
-            }
-        }
-        .padding(.horizontal, 24)
-        .padding(.top, 12)
-        .padding(.bottom, 28)
-        .background(
+        ZStack {
+            // Background
             Rectangle()
                 .fill(Color(.systemBackground))
                 .shadow(color: Color.black.opacity(0.05), radius: 10, x: 0, y: -5)
-        )
+            
+            HStack(spacing: 0) {
+                // Left tabs
+                ForEach(MainTab.leftTabs, id: \.self) { tab in
+                    TabBarButton(
+                        tab: tab,
+                        isSelected: selectedTab == tab
+                    ) {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            selectedTab = tab
+                        }
+                    }
+                }
+                
+                // Center button (Check-in)
+                centerButton
+                    .offset(y: -20)
+                
+                // Right tabs
+                ForEach(MainTab.rightTabs, id: \.self) { tab in
+                    TabBarButton(
+                        tab: tab,
+                        isSelected: selectedTab == tab
+                    ) {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            selectedTab = tab
+                        }
+                    }
+                }
+            }
+            .padding(.horizontal, 8)
+        }
+        .frame(height: 80)
+    }
+    
+    // MARK: - Center Button
+    private var centerButton: some View {
+        Button {
+            showCheckIn = true
+        } label: {
+            ZStack {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [Color.blue, Color.blue.opacity(0.8)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 56, height: 56)
+                    .shadow(color: Color.blue.opacity(0.3), radius: 8, x: 0, y: 4)
+                
+                Image(systemName: "plus")
+                    .font(.system(size: 24, weight: .semibold))
+                    .foregroundColor(.white)
+            }
+        }
+        .frame(maxWidth: .infinity)
     }
 }
 
@@ -88,16 +163,17 @@ struct TabBarButton: View {
     
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 6) {
+            VStack(spacing: 4) {
                 Image(systemName: isSelected ? tab.selectedIcon : tab.icon)
-                    .font(.system(size: 22))
+                    .font(.system(size: 20))
                     .foregroundColor(isSelected ? .blue : .secondary)
                 
                 Text(tab.rawValue)
-                    .font(.system(size: 11, weight: isSelected ? .semibold : .regular))
+                    .font(.system(size: 10, weight: isSelected ? .semibold : .regular))
                     .foregroundColor(isSelected ? .blue : .secondary)
             }
             .frame(maxWidth: .infinity)
+            .padding(.top, 8)
         }
     }
 }

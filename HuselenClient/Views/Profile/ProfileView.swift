@@ -10,6 +10,11 @@ import SwiftUI
 struct ProfileView: View {
     @ObservedObject var authViewModel: AuthViewModel
     @EnvironmentObject var viewModel: ProfileViewModel
+    @State private var showWeightTracking = false
+    
+    private var userId: String {
+        authViewModel.currentUser?.id.uuidString.lowercased() ?? ""
+    }
     
     var body: some View {
         NavigationStack {
@@ -136,9 +141,38 @@ struct ProfileView: View {
     // MARK: - Menu Section
     private var menuSection: some View {
         VStack(spacing: 2) {
-            ProfileMenuItem(icon: "target", title: "Mục tiêu của tôi", color: .blue)
+            // Weight Tracking - Navigable
+            Button {
+                showWeightTracking = true
+            } label: {
+                HStack(spacing: 16) {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(Color.blue.opacity(0.1))
+                            .frame(width: 36, height: 36)
+                        
+                        Image(systemName: "scalemass.fill")
+                            .font(.system(size: 16))
+                            .foregroundColor(.blue)
+                    }
+                    
+                    Text("Theo dõi cân nặng")
+                        .font(.system(size: 16))
+                        .foregroundColor(.primary)
+                    
+                    Spacer()
+                    
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 14))
+                        .foregroundColor(.secondary)
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 14)
+            }
+            
+            ProfileMenuItem(icon: "target", title: "Mục tiêu của tôi", color: .orange)
             ProfileMenuItem(icon: "chart.line.uptrend.xyaxis", title: "Thống kê", color: .green)
-            ProfileMenuItem(icon: "bell.fill", title: "Thông báo", color: .orange)
+            ProfileMenuItem(icon: "bell.fill", title: "Thông báo", color: .yellow)
             ProfileMenuItem(icon: "gearshape.fill", title: "Cài đặt", color: .gray)
             ProfileMenuItem(icon: "questionmark.circle.fill", title: "Trợ giúp", color: .purple)
         }
@@ -147,6 +181,9 @@ struct ProfileView: View {
                 .fill(Color(.systemBackground))
         )
         .clipShape(RoundedRectangle(cornerRadius: 16))
+        .fullScreenCover(isPresented: $showWeightTracking) {
+            WeightTrackingView(userId: userId)
+        }
     }
     
     // MARK: - Sign Out Button
