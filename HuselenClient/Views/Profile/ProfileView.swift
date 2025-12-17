@@ -1,0 +1,235 @@
+//
+//  ProfileView.swift
+//  HuselenClient
+//
+//  Created by Le Thach lam on 17/12/25.
+//
+
+import SwiftUI
+
+struct ProfileView: View {
+    @ObservedObject var authViewModel: AuthViewModel
+    @EnvironmentObject var viewModel: ProfileViewModel
+    
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: 24) {
+                    // Profile Header
+                    profileHeader
+                    
+                    // Stats Summary
+                    statsSummary
+                    
+                    // Menu Items
+                    menuSection
+                    
+                    // Sign Out Button
+                    signOutButton
+                    
+                    Spacer(minLength: 40)
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 16)
+            }
+            .background(Color(.systemGroupedBackground))
+            .navigationTitle("Hồ sơ")
+            .navigationBarTitleDisplayMode(.inline)
+            .task {
+                if let userId = authViewModel.currentUser?.id {
+                    await viewModel.loadProfile(userId: userId.uuidString.lowercased())
+                }
+            }
+        }
+    }
+    
+    // MARK: - Profile Header
+    private var profileHeader: some View {
+        VStack(spacing: 16) {
+            // Avatar
+            if let avatarUrl = viewModel.userProfile?.avatarUrl,
+               let url = URL(string: avatarUrl) {
+                AsyncImage(url: url) { image in
+                    image
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                } placeholder: {
+                    defaultAvatar
+                }
+                .frame(width: 100, height: 100)
+                .clipShape(Circle())
+            } else {
+                defaultAvatar
+            }
+            
+            // Name
+            VStack(spacing: 4) {
+                Text(viewModel.userProfile?.displayName ?? "Người dùng")
+                    .font(.system(size: 24, weight: .bold))
+                    .foregroundColor(.primary)
+                
+                Text(authViewModel.currentUser?.email ?? "")
+                    .font(.system(size: 14))
+                    .foregroundColor(.secondary)
+            }
+            
+            // Edit Profile Button
+            Button {
+                // Navigate to edit profile
+            } label: {
+                Text("Chỉnh sửa hồ sơ")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(.blue)
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 10)
+                    .background(
+                        Capsule()
+                            .stroke(Color.blue, lineWidth: 1)
+                    )
+            }
+        }
+        .padding(.vertical, 20)
+    }
+    
+    private var defaultAvatar: some View {
+        Circle()
+            .fill(
+                LinearGradient(
+                    gradient: Gradient(colors: [
+                        Color(red: 1.0, green: 0.85, blue: 0.75),
+                        Color(red: 1.0, green: 0.9, blue: 0.85)
+                    ]),
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
+            .frame(width: 100, height: 100)
+            .overlay(
+                Image(systemName: "person.fill")
+                    .font(.system(size: 40))
+                    .foregroundColor(.white.opacity(0.8))
+            )
+    }
+    
+    // MARK: - Stats Summary
+    private var statsSummary: some View {
+        HStack(spacing: 0) {
+            StatItem(value: "\(viewModel.totalWorkouts)", title: "Buổi tập")
+            
+            Divider()
+                .frame(height: 40)
+            
+            StatItem(value: "\(viewModel.totalMinutes)", title: "Phút")
+            
+            Divider()
+                .frame(height: 40)
+            
+            StatItem(value: "\(viewModel.totalCalories)", title: "Kcal")
+        }
+        .padding(.vertical, 20)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color(.systemBackground))
+        )
+    }
+    
+    // MARK: - Menu Section
+    private var menuSection: some View {
+        VStack(spacing: 2) {
+            ProfileMenuItem(icon: "target", title: "Mục tiêu của tôi", color: .blue)
+            ProfileMenuItem(icon: "chart.line.uptrend.xyaxis", title: "Thống kê", color: .green)
+            ProfileMenuItem(icon: "bell.fill", title: "Thông báo", color: .orange)
+            ProfileMenuItem(icon: "gearshape.fill", title: "Cài đặt", color: .gray)
+            ProfileMenuItem(icon: "questionmark.circle.fill", title: "Trợ giúp", color: .purple)
+        }
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color(.systemBackground))
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+    }
+    
+    // MARK: - Sign Out Button
+    private var signOutButton: some View {
+        Button {
+            Task {
+                await authViewModel.signOut()
+            }
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "rectangle.portrait.and.arrow.right")
+                Text("Đăng xuất")
+            }
+            .font(.system(size: 16, weight: .medium))
+            .foregroundColor(.red)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 16)
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color(.systemBackground))
+            )
+        }
+    }
+}
+
+// MARK: - Stat Item
+struct StatItem: View {
+    let value: String
+    let title: String
+    
+    var body: some View {
+        VStack(spacing: 4) {
+            Text(value)
+                .font(.system(size: 22, weight: .bold))
+                .foregroundColor(.primary)
+            
+            Text(title)
+                .font(.system(size: 13))
+                .foregroundColor(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+    }
+}
+
+// MARK: - Profile Menu Item
+struct ProfileMenuItem: View {
+    let icon: String
+    let title: String
+    let color: Color
+    
+    var body: some View {
+        Button {
+            // Navigate
+        } label: {
+            HStack(spacing: 16) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(color.opacity(0.1))
+                        .frame(width: 36, height: 36)
+                    
+                    Image(systemName: icon)
+                        .font(.system(size: 16))
+                        .foregroundColor(color)
+                }
+                
+                Text(title)
+                    .font(.system(size: 16))
+                    .foregroundColor(.primary)
+                
+                Spacer()
+                
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 14))
+                    .foregroundColor(.secondary)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+        }
+    }
+}
+
+#Preview {
+    ProfileView(authViewModel: AuthViewModel())
+        .environmentObject(ProfileViewModel())
+}
+

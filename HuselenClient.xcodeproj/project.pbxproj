@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		5828C51B2EF2644F00F0FCDA /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = 5828C4E12EF2650000F0FCDA /* Supabase */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		5828C4C12EF2639B00F0FCDA /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -52,6 +56,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				5828C51B2EF2644F00F0FCDA /* Supabase in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -112,6 +117,7 @@
 			);
 			name = HuselenClient;
 			packageProductDependencies = (
+				5828C4E12EF2650000F0FCDA /* Supabase */,
 			);
 			productName = HuselenClient;
 			productReference = 5828C4AF2EF2639900F0FCDA /* HuselenClient.app */;
@@ -195,6 +201,9 @@
 			);
 			mainGroup = 5828C4A62EF2639900F0FCDA;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				5828C4E02EF2650000F0FCDA /* XCRemoteSwiftPackageReference "supabase-swift" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 5828C4B02EF2639900F0FCDA /* Products */;
 			projectDirPath = "";
@@ -321,6 +330,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
+				INFOPLIST_KEY_NSCameraUsageDescription = "Chúng tôi cần quyền truy cập camera để bạn check-in buổi tập";
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
@@ -376,6 +386,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
+				INFOPLIST_KEY_NSCameraUsageDescription = "Chúng tôi cần quyền truy cập camera để bạn check-in buổi tập";
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
@@ -591,6 +602,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		5828C4E02EF2650000F0FCDA /* XCRemoteSwiftPackageReference "supabase-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/supabase/supabase-swift.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.0.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		5828C4E12EF2650000F0FCDA /* Supabase */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 5828C4E02EF2650000F0FCDA /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = Supabase;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 5828C4A72EF2639900F0FCDA /* Project object */;
 }
