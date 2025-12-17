@@ -12,7 +12,7 @@ struct MealLogView: View {
     @StateObject private var viewModel = MealLogViewModel()
     @State private var showCamera = false
     @State private var showDatePicker = false
-    @State private var captureForMealType: MealType?
+    @State private var captureForMealType: MealType? = .breakfast
     
     let userId: String
     
@@ -28,7 +28,7 @@ struct MealLogView: View {
                 ScrollView {
                     VStack(spacing: 24) {
                         // Main meals (Sáng, Trưa, Chiều)
-                        ForEach([MealType.breakfast, .lunch, .afternoon], id: \.self) { mealType in
+                        ForEach([MealType.breakfast, MealType.lunch, MealType.afternoon], id: \.self) { mealType in
                             MealSectionView(
                                 mealType: mealType,
                                 mealLog: viewModel.mealLogs[mealType],
@@ -280,40 +280,75 @@ struct MealSectionView: View {
                 }
             }
             
-            // Note Input
-            HStack(spacing: 12) {
-                Image(systemName: "text.alignleft")
-                    .font(.system(size: 16))
-                    .foregroundColor(.secondary)
-                
-                TextField("Ghi chú ngắn...", text: $noteText)
-                    .font(.system(size: 15))
-                    .focused($isNoteFocused)
-                    .onSubmit {
-                        if !noteText.isEmpty {
-                            onSaveNote(noteText)
-                            noteText = ""
+            // Note Input - Always visible below photo/empty state
+            VStack(alignment: .leading, spacing: 8) {
+                // Show existing note if any (read-only display)
+                if let log = mealLog, let existingNote = log.note, !existingNote.isEmpty, noteText.isEmpty {
+                    HStack(spacing: 10) {
+                        Image(systemName: "note.text")
+                            .font(.system(size: 14))
+                            .foregroundColor(.blue)
+                        
+                        Text(existingNote)
+                            .font(.system(size: 14))
+                            .foregroundColor(.primary)
+                            .lineLimit(3)
+                        
+                        Spacer()
+                        
+                        Button {
+                            noteText = existingNote
+                            isNoteFocused = true
+                        } label: {
+                            Image(systemName: "pencil.circle.fill")
+                                .font(.system(size: 20))
+                                .foregroundColor(.secondary)
                         }
                     }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 10)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(Color(.systemGray6))
+                    )
+                }
                 
-                if !noteText.isEmpty {
-                    Button {
-                        onSaveNote(noteText)
-                        noteText = ""
-                        isNoteFocused = false
-                    } label: {
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.system(size: 24))
-                            .foregroundColor(.blue)
+                // Note input field
+                HStack(spacing: 12) {
+                    Image(systemName: "text.alignleft")
+                        .font(.system(size: 16))
+                        .foregroundColor(.secondary)
+                    
+                    TextField("Thêm ghi chú cho bữa ăn...", text: $noteText)
+                        .font(.system(size: 15))
+                        .focused($isNoteFocused)
+                        .onSubmit {
+                            if !noteText.isEmpty {
+                                onSaveNote(noteText)
+                                noteText = ""
+                            }
+                        }
+                    
+                    if !noteText.isEmpty {
+                        Button {
+                            onSaveNote(noteText)
+                            noteText = ""
+                            isNoteFocused = false
+                        } label: {
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.system(size: 24))
+                                .foregroundColor(.blue)
+                        }
                     }
                 }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color(.systemBackground))
+                        .shadow(color: Color.black.opacity(0.03), radius: 2, x: 0, y: 1)
+                )
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-            .background(
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(Color(.systemBackground))
-            )
             
             // Feeling selector (only show if meal has content)
             if mealLog?.hasContent == true {
@@ -414,22 +449,6 @@ struct LocketStylePhotoCard: View {
             .padding(16)
         }
         
-        // Note below photo if exists
-        if let note = note, !note.isEmpty {
-            HStack(spacing: 8) {
-                Image(systemName: "text.alignleft")
-                    .font(.system(size: 14))
-                    .foregroundColor(.blue)
-                
-                Text(note)
-                    .font(.system(size: 14))
-                    .foregroundColor(.primary)
-                    .lineLimit(2)
-                
-                Spacer()
-            }
-            .padding(.top, 8)
-        }
     }
 }
 
@@ -580,41 +599,32 @@ struct MealPhotoCapture: View {
             let screenWidth = geometry.size.width
             let screenHeight = geometry.size.height
             let squareSize = screenWidth - 40
-            let squareY = (screenHeight - squareSize) / 2
             
-            ZStack(alignment: .top) {
+            ZStack {
                 // Full screen camera preview
                 MealCameraPreview(session: cameraManager.session)
                     .frame(width: screenWidth, height: screenHeight)
                 
-                // Dark overlay - Top
+                // Dark overlay with rounded square cutout
                 Rectangle()
                     .fill(Color.black.opacity(0.6))
-                    .frame(width: screenWidth, height: squareY)
+                    .mask(
+                        ZStack {
+                            Rectangle()
+                                .fill(Color.white)
+                            
+                            RoundedRectangle(cornerRadius: 24)
+                                .fill(Color.black)
+                                .frame(width: squareSize, height: squareSize)
+                                .blendMode(.destinationOut)
+                        }
+                        .compositingGroup()
+                    )
                 
-                // Dark overlay - Left
-                Rectangle()
-                    .fill(Color.black.opacity(0.6))
-                    .frame(width: 20, height: squareSize)
-                    .position(x: 10, y: squareY + squareSize / 2)
-                
-                // Dark overlay - Right
-                Rectangle()
-                    .fill(Color.black.opacity(0.6))
-                    .frame(width: 20, height: squareSize)
-                    .position(x: screenWidth - 10, y: squareY + squareSize / 2)
-                
-                // Dark overlay - Bottom
-                Rectangle()
-                    .fill(Color.black.opacity(0.6))
-                    .frame(width: screenWidth, height: screenHeight - squareY - squareSize)
-                    .position(x: screenWidth / 2, y: squareY + squareSize + (screenHeight - squareY - squareSize) / 2)
-                
-                // Viewfinder border
+                // Viewfinder border - matches the cutout exactly
                 RoundedRectangle(cornerRadius: 24)
                     .stroke(Color.white, lineWidth: 3)
                     .frame(width: squareSize, height: squareSize)
-                    .position(x: screenWidth / 2, y: squareY + squareSize / 2)
                 
                 // UI Overlay
                 VStack {
@@ -1102,4 +1112,3 @@ class MealCameraPreviewUIView: UIView {
 #Preview {
     MealLogView(userId: "test-user-id")
 }
-
