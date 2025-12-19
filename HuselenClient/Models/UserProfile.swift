@@ -103,6 +103,7 @@ struct UserProfile: Codable {
     var weight: Double?
     var birthDate: Date?
     var onboardingCompleted: Bool
+    var role: String?
     var createdAt: Date?
     var updatedAt: Date?
     
@@ -118,6 +119,7 @@ struct UserProfile: Codable {
         case weight
         case birthDate = "birth_date"
         case onboardingCompleted = "onboarding_completed"
+        case role
         case createdAt = "created_at"
         case updatedAt = "updated_at"
     }
@@ -134,6 +136,7 @@ struct UserProfile: Codable {
         weight: Double? = nil,
         birthDate: Date? = nil,
         onboardingCompleted: Bool = false,
+        role: String? = nil,
         createdAt: Date? = nil,
         updatedAt: Date? = nil
     ) {
@@ -148,6 +151,7 @@ struct UserProfile: Codable {
         self.weight = weight
         self.birthDate = birthDate
         self.onboardingCompleted = onboardingCompleted
+        self.role = role
         self.createdAt = createdAt
         self.updatedAt = updatedAt
     }
@@ -166,6 +170,7 @@ struct UserProfile: Codable {
         height = try container.decodeIfPresent(Double.self, forKey: .height)
         weight = try container.decodeIfPresent(Double.self, forKey: .weight)
         onboardingCompleted = try container.decodeIfPresent(Bool.self, forKey: .onboardingCompleted) ?? false
+        role = try container.decodeIfPresent(String.self, forKey: .role)
         
         // Handle birth_date (simple date format: yyyy-MM-dd)
         if let birthDateString = try container.decodeIfPresent(String.self, forKey: .birthDate) {

@@ -8,6 +8,23 @@
 import Foundation
 import Supabase
 
+// MARK: - User Role Enum
+enum UserRole: String, Codable, CaseIterable {
+    case user = "user"
+    case pt = "pt"
+    case manager = "manager"
+    case admin = "admin"
+    
+    var displayName: String {
+        switch self {
+        case .user: return "Học viên"
+        case .pt: return "Huấn luyện viên"
+        case .manager: return "Quản lý"
+        case .admin: return "Admin"
+        }
+    }
+}
+
 @MainActor
 class AuthViewModel: ObservableObject {
     @Published var isAuthenticated = false
@@ -16,6 +33,7 @@ class AuthViewModel: ObservableObject {
     @Published var currentUser: User?
     @Published var needsOnboarding = false
     @Published var isCheckingSession = true
+    @Published var userRole: UserRole = .user
     
     private let supabase = SupabaseConfig.client
     
@@ -43,7 +61,7 @@ class AuthViewModel: ObservableObject {
         isCheckingSession = false
     }
     
-    // MARK: - Check Onboarding Status
+    // MARK: - Check Onboarding Status and Role
     func checkOnboardingStatus() async {
         guard let userId = currentUser?.id else {
             // No user, sign out and go to login
@@ -67,7 +85,15 @@ class AuthViewModel: ObservableObject {
             if let profile = response.first {
                 // Profile found, check if onboarding is completed
                 needsOnboarding = !profile.onboardingCompleted
-                print("✅ Profile found, onboardingCompleted: \(profile.onboardingCompleted)")
+                
+                // Set user role from profile
+                if let roleString = profile.role, let role = UserRole(rawValue: roleString) {
+                    userRole = role
+                } else {
+                    userRole = .user // Default role
+                }
+                
+                print("✅ Profile found, onboardingCompleted: \(profile.onboardingCompleted), role: \(userRole.rawValue)")
             } else {
                 // No profile found, sign out and go to login
                 print("⚠️ No profile found for user: \(userIdString), redirecting to login...")
@@ -90,6 +116,7 @@ class AuthViewModel: ObservableObject {
         self.isAuthenticated = false
         self.currentUser = nil
         self.needsOnboarding = false
+        self.userRole = .user
     }
     
     // MARK: - Complete Onboarding
@@ -169,6 +196,7 @@ class AuthViewModel: ObservableObject {
             self.isAuthenticated = false
             self.currentUser = nil
             self.needsOnboarding = false
+            self.userRole = .user
         } catch {
             self.errorMessage = mapAuthError(error)
         }

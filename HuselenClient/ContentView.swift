@@ -32,7 +32,15 @@ struct ContentView: View {
                     )
                 } else if !authViewModel.isCheckingSession {
                     // Logged in and onboarding completed
-                    MainTabView(authViewModel: authViewModel)
+                    // Navigate based on user role
+                    switch authViewModel.userRole {
+                    case .admin, .manager:
+                        ManagerTabView(authViewModel: authViewModel)
+                    case .pt:
+                        PTTabView(authViewModel: authViewModel)
+                    case .user:
+                        MainTabView(authViewModel: authViewModel)
+                    }
                 }
             }
             .opacity(showSplash ? 0 : 1)
