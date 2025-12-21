@@ -230,11 +230,31 @@ class AddEventViewModel: ObservableObject {
                 }
             }
             
-            // Insert into class_events
-            try await supabase
+            // Insert into class_events and get the created event
+            let createdEvents: [ClassEvent] = try await supabase
                 .from("class_events")
                 .insert(eventData)
+                .select()
                 .execute()
+                .value
+            
+            // If users are selected, add them to user_class_enrollments
+            if let createdEvent = createdEvents.first, let eventId = createdEvent.id, !selectedUsers.isEmpty {
+                let enrollments = selectedUsers.map { user -> [String: AnyJSON] in
+                    [
+                        "user_id": .string(user.userId.uuidString),
+                        "class_event_id": .string(eventId.uuidString),
+                        "status": .string("active")
+                    ]
+                }
+                
+                try await supabase
+                    .from("user_class_enrollments")
+                    .insert(enrollments)
+                    .execute()
+                
+                print("✅ Added \(selectedUsers.count) users to class enrollment")
+            }
             
             isSaving = false
             saveSuccess = true

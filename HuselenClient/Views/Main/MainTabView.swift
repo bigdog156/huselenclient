@@ -9,6 +9,7 @@ import SwiftUI
 
 enum MainTab: String, CaseIterable {
     case workout = "Tập luyện"
+    case calendar = "Lịch"
     case meal = "Ăn uống"
     case weight = "Cân nặng"
     case profile = "Cá nhân"
@@ -16,6 +17,7 @@ enum MainTab: String, CaseIterable {
     var icon: String {
         switch self {
         case .workout: return "figure.strengthtraining.traditional"
+        case .calendar: return "calendar"
         case .meal: return "fork.knife"
         case .weight: return "scalemass"
         case .profile: return "person"
@@ -25,6 +27,7 @@ enum MainTab: String, CaseIterable {
     var selectedIcon: String {
         switch self {
         case .workout: return "figure.strengthtraining.traditional"
+        case .calendar: return "calendar"
         case .meal: return "fork.knife"
         case .weight: return "scalemass.fill"
         case .profile: return "person.fill"
@@ -33,7 +36,7 @@ enum MainTab: String, CaseIterable {
     
     // Tabs on left side of center button
     static var leftTabs: [MainTab] {
-        [.workout, .meal]
+        [.workout, .calendar]
     }
     
     // Tabs on right side of center button
@@ -60,6 +63,8 @@ struct MainTabView: View {
                     switch selectedTab {
                     case .workout:
                         HomeView(authViewModel: authViewModel)
+                    case .calendar:
+                        JournalView(userId: userId)
                     case .meal:
                         MealLogView(userId: userId)
                     case .weight:

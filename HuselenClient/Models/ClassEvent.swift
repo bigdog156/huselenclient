@@ -188,6 +188,24 @@ struct ClassEventAttendee: Codable, Identifiable {
         case createdAt = "created_at"
     }
     
+    init(
+        id: UUID? = nil,
+        eventId: UUID,
+        userId: UUID,
+        checkInTime: Date? = nil,
+        status: AttendeeStatus = .registered,
+        note: String? = nil,
+        createdAt: Date? = nil
+    ) {
+        self.id = id
+        self.eventId = eventId
+        self.userId = userId
+        self.checkInTime = checkInTime
+        self.status = status
+        self.note = note
+        self.createdAt = createdAt
+    }
+    
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         

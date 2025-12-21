@@ -131,22 +131,22 @@ struct HomeView: View {
                 value: viewModel.todayStats?.weight != nil ? "\(Int(viewModel.todayStats!.weight!)) kg" : "-- kg"
             )
             
-            // Calories Card
+            // Meals Card (meal count instead of calories)
             StatCard(
-                icon: "flame.fill",
+                icon: "fork.knife",
                 iconColor: .orange,
                 iconBgColor: Color.orange.opacity(0.1),
-                title: "Đã nạp",
-                value: viewModel.todayStats?.caloriesConsumed != nil ? "\(viewModel.todayStats!.caloriesConsumed!.formatted()) kcal" : "-- kcal"
+                title: "Bữa ăn",
+                value: viewModel.todayStats?.caloriesConsumed != nil ? "\(viewModel.todayStats!.caloriesConsumed!) bữa" : "-- bữa"
             )
             
-            // Mood Card
+            // Check-in Card
             StatCard(
-                icon: "face.smiling.fill",
-                iconColor: .green,
-                iconBgColor: Color.green.opacity(0.1),
-                title: "Cảm xúc",
-                value: viewModel.todayStats?.mood?.displayName ?? "Chưa có"
+                icon: "checkmark.circle.fill",
+                iconColor: viewModel.hasCheckedInToday ? .green : .gray,
+                iconBgColor: viewModel.hasCheckedInToday ? Color.green.opacity(0.1) : Color.gray.opacity(0.1),
+                title: "Check-in",
+                value: viewModel.hasCheckedInToday ? "Đã điểm danh" : "Chưa điểm danh"
             )
         }
     }
@@ -215,24 +215,60 @@ struct HomeView: View {
     
     // MARK: - Check-in Button
     private var checkInButton: some View {
-        Button {
-            showCheckIn = true
-        } label: {
-            HStack(spacing: 12) {
-                Image(systemName: "checkmark.circle.fill")
-                    .font(.system(size: 22))
-                
-                Text("CHECK-IN BUỔI TẬP")
-                    .font(.system(size: 16, weight: .bold))
-                    .tracking(0.5)
+        Group {
+            if viewModel.hasCheckedInToday {
+                // Already checked in today
+                HStack(spacing: 12) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 22))
+                    
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("ĐÃ CHECK-IN HÔM NAY")
+                            .font(.system(size: 16, weight: .bold))
+                            .tracking(0.5)
+                        
+                        if let checkIn = viewModel.todayCheckIn {
+                            Text("Buổi \(checkIn.sessionNumber) • \(checkIn.formattedTime)")
+                                .font(.system(size: 13))
+                                .opacity(0.8)
+                        }
+                    }
+                    
+                    Spacer()
+                    
+                    Text("✓")
+                        .font(.system(size: 20, weight: .bold))
+                }
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 18)
+                .padding(.horizontal, 20)
+                .background(
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(Color.green)
+                )
+            } else {
+                // Not checked in yet
+                Button {
+                    showCheckIn = true
+                } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 22))
+                        
+                        Text("CHECK-IN BUỔI TẬP")
+                            .font(.system(size: 16, weight: .bold))
+                            .tracking(0.5)
+                    }
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 18)
+                    .background(
+                        RoundedRectangle(cornerRadius: 16)
+                            .fill(Color.blue)
+                    )
+                }
             }
-            .foregroundColor(.white)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 18)
-            .background(
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(Color.blue)
-            )
         }
     }
 }
