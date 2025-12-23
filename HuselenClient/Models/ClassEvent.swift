@@ -13,8 +13,8 @@ struct ClassEvent: Codable, Identifiable {
     var name: String
     var trainerId: UUID?
     var eventDate: Date
-    var startTime: Date
-    var endTime: Date
+    var startTime: String  // Time format: "HH:mm:ss" (e.g., "18:00:00")
+    var endTime: String    // Time format: "HH:mm:ss" (e.g., "19:30:00")
     var maxCapacity: Int
     var description: String?
     var recurringDays: [Int]
@@ -46,8 +46,8 @@ struct ClassEvent: Codable, Identifiable {
         name: String,
         trainerId: UUID? = nil,
         eventDate: Date = Date(),
-        startTime: Date = Date(),
-        endTime: Date = Date().addingTimeInterval(3600),
+        startTime: String = "09:00:00",
+        endTime: String = "10:00:00",
         maxCapacity: Int = 20,
         description: String? = nil,
         recurringDays: [Int] = [],
@@ -86,25 +86,17 @@ struct ClassEvent: Codable, Identifiable {
         status = try container.decodeIfPresent(ClassEventStatus.self, forKey: .status) ?? .scheduled
         createdBy = try container.decodeIfPresent(UUID.self, forKey: .createdBy)
         
-        // Decode date
+        // Decode date (from UTC to local time)
         if let dateString = try container.decodeIfPresent(String.self, forKey: .eventDate) {
-            eventDate = ClassEventDateFormatters.dateOnly.date(from: dateString) ?? Date()
+            // Parse as UTC from Supabase, automatically converts to local Date
+            eventDate = ClassEventDateFormatters.dateOnlyUTC.date(from: dateString) ?? Date()
         } else {
             eventDate = Date()
         }
         
-        // Decode times
-        if let startTimeString = try container.decodeIfPresent(String.self, forKey: .startTime) {
-            startTime = ClassEventDateFormatters.parseTime(startTimeString) ?? Date()
-        } else {
-            startTime = Date()
-        }
-        
-        if let endTimeString = try container.decodeIfPresent(String.self, forKey: .endTime) {
-            endTime = ClassEventDateFormatters.parseTime(endTimeString) ?? Date().addingTimeInterval(3600)
-        } else {
-            endTime = Date().addingTimeInterval(3600)
-        }
+        // Decode times (stored as "HH:mm:ss" strings)
+        startTime = try container.decodeIfPresent(String.self, forKey: .startTime) ?? "09:00:00"
+        endTime = try container.decodeIfPresent(String.self, forKey: .endTime) ?? "10:00:00"
         
         // Decode timestamps
         if let createdAtString = try container.decodeIfPresent(String.self, forKey: .createdAt) {
@@ -126,9 +118,10 @@ struct ClassEvent: Codable, Identifiable {
         try container.encodeIfPresent(id, forKey: .id)
         try container.encode(name, forKey: .name)
         try container.encodeIfPresent(trainerId, forKey: .trainerId)
-        try container.encode(ClassEventDateFormatters.dateOnly.string(from: eventDate), forKey: .eventDate)
-        try container.encode(ClassEventDateFormatters.formatTime(startTime), forKey: .startTime)
-        try container.encode(ClassEventDateFormatters.formatTime(endTime), forKey: .endTime)
+        // Convert local date to UTC string for Supabase
+        try container.encode(ClassEventDateFormatters.dateOnlyUTC.string(from: eventDate), forKey: .eventDate)
+        try container.encode(startTime, forKey: .startTime)  // Already in "HH:mm:ss" format
+        try container.encode(endTime, forKey: .endTime)      // Already in "HH:mm:ss" format
         try container.encode(maxCapacity, forKey: .maxCapacity)
         try container.encodeIfPresent(description, forKey: .description)
         try container.encode(recurringDays, forKey: .recurringDays)
@@ -138,9 +131,27 @@ struct ClassEvent: Codable, Identifiable {
     }
     
     var formattedTimeRange: String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "HH:mm"
-        return "\(formatter.string(from: startTime)) - \(formatter.string(from: endTime))"
+        let start = String(startTime.prefix(5))  // "18:00:00" -> "18:00"
+        let end = String(endTime.prefix(5))      // "19:30:00" -> "19:30"
+        return "\(start) - \(end)"
+    }
+    
+    var formattedStartTime: String {
+        return String(startTime.prefix(5))  // "18:00:00" -> "18:00"
+    }
+    
+    var formattedEndTime: String {
+        return String(endTime.prefix(5))    // "19:30:00" -> "19:30"
+    }
+    
+    /// Convert time string to Date object (using today's date)
+    var startTimeAsDate: Date {
+        return ClassEventDateFormatters.timeStringToDate(startTime)
+    }
+    
+    /// Convert time string to Date object (using today's date)
+    var endTimeAsDate: Date {
+        return ClassEventDateFormatters.timeStringToDate(endTime)
     }
     
     var formattedDate: String {
@@ -148,6 +159,57 @@ struct ClassEvent: Codable, Identifiable {
         formatter.locale = Locale(identifier: "vi_VN")
         formatter.dateFormat = "EEEE, dd/MM/yyyy"
         return formatter.string(from: eventDate).capitalized
+    }
+    
+    /// Check if the event occurs on a specific date (works for both recurring and non-recurring events)
+    func occursOn(date: Date) -> Bool {
+        let calendar = Calendar.current
+        
+        // Normalize dates to start of day for comparison (in local timezone)
+        let checkDate = calendar.startOfDay(for: date)
+        let startDate = calendar.startOfDay(for: eventDate)
+        
+        print("      🔍 occursOn check:")
+        print("         Check date: \(checkDate)")
+        print("         Event start date: \(startDate)")
+        print("         Is recurring: \(isRecurring)")
+        
+        if isRecurring && !recurringDays.isEmpty {
+            // For recurring events:
+            // 1. Check if the date is >= eventDate (start date)
+            // 2. Check if the weekday matches
+            
+            // Must be on or after start date
+            let isAfterStart = checkDate >= startDate
+            print("         After start: \(isAfterStart)")
+            guard isAfterStart else { 
+                print("         ❌ Date is before event start")
+                return false 
+            }
+            
+            // Check if weekday matches
+            let weekday = calendar.component(.weekday, from: date)
+            let matches = recurringDays.contains(weekday)
+            print("         Weekday: \(weekday), Recurring days: \(recurringDays)")
+            print("         Match: \(matches)")
+            
+            if matches {
+                print("         ✅ Event occurs on this date!")
+            } else {
+                print("         ❌ Weekday doesn't match")
+            }
+            return matches
+        } else {
+            // For non-recurring (fixed date) events, check exact date match
+            let matches = calendar.isDate(date, inSameDayAs: eventDate)
+            print("         Non-recurring match: \(matches)")
+            if matches {
+                print("         ✅ Event occurs on this date!")
+            } else {
+                print("         ❌ Date doesn't match")
+            }
+            return matches
+        }
     }
 }
 
@@ -305,9 +367,19 @@ struct UserInfo: Codable, Identifiable, Hashable {
 
 // MARK: - Date Formatters
 enum ClassEventDateFormatters {
+    /// Formatter for parsing date from Supabase (UTC)
+    static let dateOnlyUTC: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        formatter.timeZone = TimeZone(identifier: "UTC")
+        return formatter
+    }()
+    
+    /// Formatter for encoding date to Supabase (UTC)
     static let dateOnly: DateFormatter = {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
+        formatter.timeZone = TimeZone.current
         return formatter
     }()
     
@@ -317,20 +389,33 @@ enum ClassEventDateFormatters {
         return formatter
     }()
     
-    static func parseTime(_ timeString: String) -> Date? {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "HH:mm:ss"
-        if let date = formatter.date(from: timeString) {
-            return date
-        }
-        formatter.dateFormat = "HH:mm"
-        return formatter.date(from: timeString)
+    /// Convert time string ("HH:mm:ss") to Date object with today's date
+    static func timeStringToDate(_ timeString: String) -> Date {
+        let components = timeString.split(separator: ":").compactMap { Int($0) }
+        guard components.count >= 2 else { return Date() }
+        
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        
+        var dateComponents = DateComponents()
+        dateComponents.hour = components[0]
+        dateComponents.minute = components[1]
+        dateComponents.second = components.count > 2 ? components[2] : 0
+        
+        return calendar.date(byAdding: dateComponents, to: today) ?? Date()
     }
     
-    static func formatTime(_ date: Date) -> String {
+    /// Convert Date to time string ("HH:mm:ss")
+    static func dateToTimeString(_ date: Date) -> String {
         let formatter = DateFormatter()
         formatter.dateFormat = "HH:mm:ss"
+        formatter.timeZone = TimeZone.current
         return formatter.string(from: date)
+    }
+    
+    /// Create time string from hour, minute, second components
+    static func createTimeString(hour: Int, minute: Int, second: Int = 0) -> String {
+        return String(format: "%02d:%02d:%02d", hour, minute, second)
     }
 }
 

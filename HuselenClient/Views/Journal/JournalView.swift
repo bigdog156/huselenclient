@@ -11,6 +11,7 @@ struct JournalView: View {
     let userId: String
     @StateObject private var viewModel = CalendarViewModel()
     @State private var showEventDetail: CalendarEvent?
+    @State private var showCheckInDetail: UserCheckIn?
     
     var body: some View {
         NavigationStack {
@@ -53,6 +54,9 @@ struct JournalView: View {
                     viewModel: viewModel,
                     userId: userId
                 )
+            }
+            .sheet(item: $showCheckInDetail) { checkIn in
+                CheckInDetailSheet(checkIn: checkIn)
             }
         }
     }
@@ -162,10 +166,16 @@ struct JournalView: View {
                         isSelected: Calendar.current.isDate(date, inSameDayAs: viewModel.selectedDate),
                         isToday: Calendar.current.isDateInToday(date),
                         hasEvents: viewModel.hasEvents(on: date),
-                        eventsCount: viewModel.eventsCount(on: date)
+                        eventsCount: viewModel.eventsCount(on: date),
+                        hasCheckIn: viewModel.hasCheckIn(on: date)
                     )
                     .onTapGesture {
-                        viewModel.selectDate(date)
+                        if viewModel.hasCheckIn(on: date) {
+                            // Show check-in detail if available
+                            showCheckInDetail = viewModel.getCheckIn(for: date)
+                        } else {
+                            viewModel.selectDate(date)
+                        }
                     }
                 } else {
                     Color.clear
@@ -254,6 +264,7 @@ struct CalendarDayCell: View {
     let isToday: Bool
     let hasEvents: Bool
     let eventsCount: Int
+    let hasCheckIn: Bool
     
     var body: some View {
         VStack(spacing: 4) {
@@ -267,6 +278,18 @@ struct CalendarDayCell: View {
                     Circle()
                         .stroke(Color.blue, lineWidth: 2)
                         .frame(width: 36, height: 36)
+                } else if hasCheckIn {
+                    Circle()
+                        .fill(Color.green.opacity(0.2))
+                        .frame(width: 36, height: 36)
+                }
+                
+                // Check-in checkmark icon
+                if hasCheckIn && !isSelected {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 10))
+                        .foregroundColor(.green)
+                        .offset(x: 12, y: -12)
                 }
                 
                 Text("\(Calendar.current.component(.day, from: date))")
@@ -372,10 +395,9 @@ struct CalendarEventCard: View {
         )
     }
     
-    private func formatTime(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "HH:mm"
-        return formatter.string(from: date)
+    private func formatTime(_ timeString: String) -> String {
+        // timeString is already "HH:mm:ss", just take first 5 chars
+        return String(timeString.prefix(5))  // "18:00:00" -> "18:00"
     }
 }
 
@@ -452,10 +474,9 @@ struct EventCard: View {
         )
     }
     
-    private func formatTime(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "HH:mm"
-        return formatter.string(from: date)
+    private func formatTime(_ timeString: String) -> String {
+        // timeString is already "HH:mm:ss", just take first 5 chars
+        return String(timeString.prefix(5))  // "18:00:00" -> "18:00"
     }
 }
 
@@ -786,6 +807,140 @@ struct CalendarEventDetailSheet: View {
             }
         }
         .presentationDetents([.medium, .large])
+    }
+}
+
+// MARK: - Check-In Detail Sheet
+struct CheckInDetailSheet: View {
+    let checkIn: UserCheckIn
+    @Environment(\.dismiss) private var dismiss
+    @State private var loadedImage: UIImage?
+    
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: 24) {
+                    // Header
+                    VStack(spacing: 8) {
+                        Image(systemName: "checkmark.seal.fill")
+                            .font(.system(size: 50))
+                            .foregroundColor(.green)
+                        
+                        Text("Check-in thành công")
+                            .font(.system(size: 24, weight: .bold))
+                            .foregroundColor(.primary)
+                        
+                        Text(checkIn.formattedDate)
+                            .font(.system(size: 16))
+                            .foregroundColor(.secondary)
+                        
+                        Text(checkIn.formattedTime)
+                            .font(.system(size: 20, weight: .semibold))
+                            .foregroundColor(.blue)
+                    }
+                    .padding(.top, 20)
+                    
+                    // Check-in Photo
+                    if let photoUrl = checkIn.photoUrl {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("Hình ảnh check-in")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundColor(.primary)
+                            
+                            if let loadedImage = loadedImage {
+                                Image(uiImage: loadedImage)
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                                    .frame(maxWidth: .infinity)
+                                    .frame(height: 300)
+                                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                            } else {
+                                ZStack {
+                                    RoundedRectangle(cornerRadius: 16)
+                                        .fill(Color(.systemGray6))
+                                        .frame(height: 300)
+                                    
+                                    ProgressView()
+                                }
+                                .task {
+                                    await loadImage(from: photoUrl)
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Check-in Details
+                    VStack(spacing: 16) {
+                        DetailRow(
+                            icon: "number.circle.fill",
+                            title: "Buổi tập",
+                            value: "Buổi #\(checkIn.sessionNumber)"
+                        )
+                        
+                        if let mood = checkIn.mood {
+                            DetailRow(
+                                icon: "face.smiling.fill",
+                                title: "Tâm trạng",
+                                value: mood.displayName
+                            )
+                        }
+                        
+                        if let note = checkIn.note, !note.isEmpty {
+                            VStack(alignment: .leading, spacing: 8) {
+                                HStack(spacing: 16) {
+                                    Image(systemName: "note.text")
+                                        .font(.system(size: 18))
+                                        .foregroundColor(.blue)
+                                        .frame(width: 24)
+                                    
+                                    Text("Ghi chú")
+                                        .font(.system(size: 13))
+                                        .foregroundColor(.secondary)
+                                }
+                                
+                                Text(note)
+                                    .font(.system(size: 15))
+                                    .foregroundColor(.primary)
+                                    .padding(.leading, 40)
+                            }
+                        }
+                    }
+                    .padding(20)
+                    .background(
+                        RoundedRectangle(cornerRadius: 16)
+                            .fill(Color(.systemGray6))
+                    )
+                    
+                    Spacer(minLength: 40)
+                }
+                .padding(.horizontal, 20)
+            }
+            .background(Color(.systemGroupedBackground))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Đóng") {
+                        dismiss()
+                    }
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+    }
+    
+    private func loadImage(from urlString: String) async {
+        guard let url = URL(string: urlString) else { return }
+        
+        do {
+            let (data, _) = try await URLSession.shared.data(from: url)
+            if let image = UIImage(data: data) {
+                await MainActor.run {
+                    self.loadedImage = image
+                }
+            }
+        } catch {
+            print("Error loading image: \(error)")
+        }
     }
 }
 

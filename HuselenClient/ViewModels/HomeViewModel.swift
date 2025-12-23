@@ -14,11 +14,14 @@ class HomeViewModel: ObservableObject {
     @Published var todayStats: DailyStats?
     @Published var upcomingWorkout: Workout?
     @Published var todayEvent: ClassEvent?
+    @Published var todayEvents: [ClassEvent] = []  // All events for today
     @Published var todayCheckIn: UserCheckIn?
     @Published var checkInStats: CheckInStats = .empty
     @Published var todayQuote: MotivationalQuote
     @Published var isLoading = false
     @Published var errorMessage: String?
+    @Published var hasTodayClass: Bool = false
+    @Published var todayClassRecurringDays: [Int] = []
     
     private let supabase = SupabaseConfig.client
     
@@ -125,7 +128,6 @@ class HomeViewModel: ObservableObject {
     // MARK: - Load Today Event
     private func loadTodayEvent(userId: String) async {
         let calendar = Calendar.current
-        let todayWeekday = calendar.component(.weekday, from: Date()) // 1 = Sunday, 2 = Monday, etc.
         
         do {
             // First, fetch user's class enrollments
@@ -137,9 +139,14 @@ class HomeViewModel: ObservableObject {
                 .execute()
                 .value
             
+            print("📚 Found \(enrollments.count) active enrollments")
+            
             guard !enrollments.isEmpty else {
+                print("⚠️ No active enrollments found")
                 self.todayEvent = nil
+                self.todayEvents = []
                 self.upcomingWorkout = nil
+                self.hasTodayClass = false
                 return
             }
             
@@ -155,34 +162,93 @@ class HomeViewModel: ObservableObject {
                 .execute()
                 .value
             
-            // Find a class that runs today (based on recurring_days or event_date)
-            var todayClass: ClassEvent?
+            print("📅 Found \(enrolledClasses.count) scheduled classes")
+            
+            // Find ALL classes that run toda
+            var todayClasses: [ClassEvent] = []
+            let today = Date()
+            let todayNormalized = calendar.startOfDay(for: today)
+            
+            // Use UTC formatter to parse enrollment dates from Supabase
+            let dateFormatterUTC = DateFormatter()
+            dateFormatterUTC.dateFormat = "yyyy-MM-dd"
+            dateFormatterUTC.timeZone = TimeZone(identifier: "UTC")
+            
+            let dateFormatterLocal = DateFormatter()
+            dateFormatterLocal.dateFormat = "yyyy-MM-dd"
+            dateFormatterLocal.timeZone = TimeZone.current
+            
+            let todayWeekday = calendar.component(.weekday, from: today)
+            print("📍 Today: \(dateFormatterLocal.string(from: today)), Weekday: \(todayWeekday)")
             
             for classEvent in enrolledClasses {
-                if classEvent.isRecurring && classEvent.recurringDays.contains(todayWeekday) {
-                    // This recurring class runs today
-                    if classEvent.eventDate <= Date() { // Only show if class has started
-                        todayClass = classEvent
-                        break
+                print("\n🔎 Checking: \(classEvent.name)")
+                print("   ID: \(classEvent.id?.uuidString ?? "nil")")
+                print("   Event Date (from DB): \(dateFormatterLocal.string(from: classEvent.eventDate))")
+                print("   Recurring: \(classEvent.isRecurring), Days: \(classEvent.recurringDays)")
+                print("   Start Time: \(classEvent.startTime), End Time: \(classEvent.endTime)")
+                
+                // Find the enrollment for this class
+                guard let enrollment = enrollments.first(where: { $0.classEventId == classEvent.id?.uuidString.lowercased() }) else {
+                    print("   ❌ No enrollment found")
+                    continue
+                }
+                
+                print("   Enrollment found - ID: \(enrollment.id)")
+                print("   Enrollment start_date: \(enrollment.startDate ?? "nil")")
+                
+                // Check if today is on or after the enrollment start_date
+                if let startDateString = enrollment.startDate {
+                    // Parse as UTC from Supabase
+                    if let startDate = dateFormatterUTC.date(from: startDateString) {
+                        let startDateNormalized = calendar.startOfDay(for: startDate)
+                        if todayNormalized < startDateNormalized {
+                            print("   ❌ Before start date: \(startDateString) (parsed: \(startDate))")
+                            continue
+                        } else {
+                            print("   ✅ After or on start date")
+                        }
+                    } else {
+                        print("   ⚠️ Could not parse start_date: \(startDateString)")
                     }
-                } else if !classEvent.isRecurring && calendar.isDateInToday(classEvent.eventDate) {
-                    // Non-recurring class is today
-                    todayClass = classEvent
-                    break
+                }
+                
+                if classEvent.occursOn(date: today) {
+                    print("   ✅ Occurs today!")
+                    todayClasses.append(classEvent)
+                } else {
+                    print("   ❌ Does not occur today")
                 }
             }
             
-            if let event = todayClass {
-                self.todayEvent = event
-                self.upcomingWorkout = convertEventToWorkout(event)
+            // Sort by start time
+            todayClasses.sort { $0.startTime < $1.startTime }  // String comparison works for "HH:mm:ss" format
+            
+            print("\n📊 Total today classes: \(todayClasses.count)")
+            
+            self.todayEvents = todayClasses
+            
+            if let firstEvent = todayClasses.first {
+                print("✅ hasTodayClass = true")
+                self.todayEvent = firstEvent
+                self.upcomingWorkout = convertEventToWorkout(firstEvent)
+                self.hasTodayClass = true
+                self.todayClassRecurringDays = firstEvent.recurringDays
             } else {
+                print("⚠️ No classes today")
                 self.todayEvent = nil
+                self.todayEvents = []
                 self.upcomingWorkout = nil
+                self.hasTodayClass = false
+                self.todayClassRecurringDays = []
             }
         } catch {
-            print("Error loading today event: \(error)")
+            print("❌ Error loading today event: \(error)")
             self.todayEvent = nil
+            self.todayEvents = []
             self.upcomingWorkout = nil
+            self.hasTodayClass = false
+            self.todayClassRecurringDays = []
         }
     }
     
@@ -274,13 +340,17 @@ class HomeViewModel: ObservableObject {
     
     // MARK: - Convert Event to Workout
     private func convertEventToWorkout(_ event: ClassEvent) -> Workout {
+        // Convert time strings to Date objects for calculations
+        let startDate = event.startTimeAsDate
+        let endDate = event.endTimeAsDate
+        
         // Calculate duration in minutes
-        let duration = Int(event.endTime.timeIntervalSince(event.startTime) / 60)
+        let duration = Int(endDate.timeIntervalSince(startDate) / 60)
         
         // Combine event date with start time
         let calendar = Calendar.current
         let dateComponents = calendar.dateComponents([.year, .month, .day], from: event.eventDate)
-        let timeComponents = calendar.dateComponents([.hour, .minute], from: event.startTime)
+        let timeComponents = calendar.dateComponents([.hour, .minute], from: startDate)
         
         var combinedComponents = DateComponents()
         combinedComponents.year = dateComponents.year
@@ -289,7 +359,7 @@ class HomeViewModel: ObservableObject {
         combinedComponents.hour = timeComponents.hour
         combinedComponents.minute = timeComponents.minute
         
-        let scheduledTime = calendar.date(from: combinedComponents) ?? event.startTime
+        let scheduledTime = calendar.date(from: combinedComponents) ?? startDate
         
         // Map ClassEventStatus to WorkoutStatus
         let workoutStatus: WorkoutStatus
@@ -331,6 +401,31 @@ class HomeViewModel: ObservableObject {
     // MARK: - Check if already checked in today
     var hasCheckedInToday: Bool {
         return todayCheckIn != nil
+    }
+    
+    // MARK: - Check if can check in
+    var canCheckIn: Bool {
+        return hasTodayClass && !hasCheckedInToday
+    }
+    
+    // MARK: - Get recurring days display text
+    var recurringDaysText: String {
+        guard !todayClassRecurringDays.isEmpty else { return "" }
+        
+        let dayNames = todayClassRecurringDays.sorted().map { dayNumber -> String in
+            switch dayNumber {
+            case 1: return "CN"
+            case 2: return "T2"
+            case 3: return "T3"
+            case 4: return "T4"
+            case 5: return "T5"
+            case 6: return "T6"
+            case 7: return "T7"
+            default: return ""
+            }
+        }
+        
+        return dayNames.joined(separator: ", ")
     }
     
     // MARK: - Greeting
@@ -433,12 +528,14 @@ private struct UserClassEnrollmentResponse: Codable {
     let userId: String
     let classEventId: String
     let status: String
+    let startDate: String?
     
     enum CodingKeys: String, CodingKey {
         case id
         case userId = "user_id"
         case classEventId = "class_event_id"
         case status
+        case startDate = "start_date"
     }
 }
 

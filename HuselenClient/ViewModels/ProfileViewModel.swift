@@ -14,10 +14,12 @@ class ProfileViewModel: ObservableObject {
     @Published var isLoading = false
     @Published var errorMessage: String?
     
-    // Mock stats for now
-    @Published var totalWorkouts = 24
-    @Published var totalMinutes = 1080
-    @Published var totalCalories = 12500
+    // Real stats from database
+    @Published var totalCheckIns = 0
+    @Published var totalMealLogs = 0
+    @Published var totalWeightLogs = 0
+    @Published var currentWeight: Double?
+    @Published var latestWeightChange: Double?
     
     private let supabase = SupabaseConfig.client
     
@@ -35,11 +37,105 @@ class ProfileViewModel: ObservableObject {
                 .value
             
             self.userProfile = profile
+            
+            // Load real stats
+            await loadUserStats(userId: userId)
         } catch {
             print("Error loading profile: \(error)")
         }
         
         isLoading = false
+    }
+    
+    // MARK: - Load User Stats
+    private func loadUserStats(userId: String) async {
+        // Load check-in count
+        await loadCheckInStats(userId: userId)
+        
+        // Load meal log count
+        await loadMealLogStats(userId: userId)
+        
+        // Load weight stats
+        await loadWeightStats(userId: userId)
+    }
+    
+    // MARK: - Load Check-In Stats
+    private func loadCheckInStats(userId: String) async {
+        do {
+            let checkIns: [CheckInCountResponse] = try await supabase
+                .from("user_check_ins")
+                .select("id")
+                .eq("user_id", value: userId)
+                .execute()
+                .value
+            
+            self.totalCheckIns = checkIns.count
+        } catch {
+            print("Error loading check-in stats: \(error)")
+        }
+    }
+    
+    // MARK: - Load Meal Log Stats
+    private func loadMealLogStats(userId: String) async {
+        do {
+            let mealLogs: [MealLogCountResponse] = try await supabase
+                .from("user_meal_logs")
+                .select("id")
+                .eq("user_id", value: userId)
+                .execute()
+                .value
+            
+            self.totalMealLogs = mealLogs.count
+        } catch {
+            print("Error loading meal log stats: \(error)")
+        }
+    }
+    
+    // MARK: - Load Weight Stats
+    private func loadWeightStats(userId: String) async {
+        do {
+            let weightLogs: [WeightLogStatsResponse] = try await supabase
+                .from("user_weight_logs")
+                .select("id, weight_kg, logged_date")
+                .eq("user_id", value: userId)
+                .order("logged_date", ascending: false)
+                .execute()
+                .value
+            
+            self.totalWeightLogs = weightLogs.count
+            
+            if let latest = weightLogs.first {
+                self.currentWeight = latest.weightKg
+                
+                // Calculate weight change if there are at least 2 logs
+                if weightLogs.count >= 2 {
+                    self.latestWeightChange = latest.weightKg - weightLogs[1].weightKg
+                }
+            }
+        } catch {
+            print("Error loading weight stats: \(error)")
+        }
+    }
+}
+
+// MARK: - Response Models
+private struct CheckInCountResponse: Codable {
+    let id: String
+}
+
+private struct MealLogCountResponse: Codable {
+    let id: String
+}
+
+private struct WeightLogStatsResponse: Codable {
+    let id: String
+    let weightKg: Double
+    let loggedDate: String
+    
+    enum CodingKeys: String, CodingKey {
+        case id
+        case weightKg = "weight_kg"
+        case loggedDate = "logged_date"
     }
 }
 

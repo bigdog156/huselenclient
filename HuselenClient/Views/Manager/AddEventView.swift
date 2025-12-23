@@ -135,65 +135,192 @@ struct AddEventView: View {
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundColor(.blue)
                 
-                Text("LỊCH TRÌNH ĐỊNH KỲ")
+                Text("LỊCH TRÌNH")
                     .font(.system(size: 13, weight: .bold))
                     .foregroundColor(.blue)
                     .tracking(0.5)
             }
             
             VStack(alignment: .leading, spacing: 16) {
-                // Weekday Selection
+                // Schedule Type Selection
                 VStack(alignment: .leading, spacing: 12) {
-                    Text("Lặp lại vào các ngày")
+                    Text("Loại lịch trình")
                         .font(.system(size: 14, weight: .medium))
                         .foregroundColor(.primary)
                     
-                    // Weekday Chips
-                    HStack(spacing: 8) {
-                        ForEach(Weekday.all) { day in
-                            WeekdayChip(
-                                day: day,
-                                isSelected: viewModel.isDaySelected(day.id)
+                    HStack(spacing: 12) {
+                        ForEach(ScheduleType.allCases, id: \.rawValue) { type in
+                            ScheduleTypeButton(
+                                type: type,
+                                isSelected: viewModel.scheduleType == type
                             ) {
-                                viewModel.toggleDay(day.id)
+                                withAnimation(.easeInOut(duration: 0.2)) {
+                                    viewModel.scheduleType = type
+                                }
                             }
                         }
                     }
-                    
-                    Text("Lớp học sẽ tự động tạo lịch cho các ngày đã chọn")
-                        .font(.system(size: 12))
-                        .foregroundColor(.secondary)
                 }
                 
-                // Time Selection
-                HStack(spacing: 16) {
-                    // Start Time
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Bắt đầu")
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundColor(.primary)
-                        
-                        TimePickerButton(
-                            time: $viewModel.startTime,
-                            label: viewModel.formattedStartTime
-                        )
+                // Conditional Schedule Content
+                if viewModel.scheduleType == .recurring {
+                    recurringScheduleContent
+                } else {
+                    fixedDatesScheduleContent
+                }
+                
+                // Time Selection (common for both)
+                timeSelectionContent
+            }
+        }
+    }
+    
+    // MARK: - Recurring Schedule Content
+    private var recurringScheduleContent: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Lặp lại vào các ngày")
+                .font(.system(size: 14, weight: .medium))
+                .foregroundColor(.primary)
+            
+            // Weekday Chips
+            HStack(spacing: 8) {
+                ForEach(Weekday.all) { day in
+                    WeekdayChip(
+                        day: day,
+                        isSelected: viewModel.isDaySelected(day.id)
+                    ) {
+                        viewModel.toggleDay(day.id)
                     }
-                    .frame(maxWidth: .infinity)
-                    
-                    // End Time
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Kết thúc")
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundColor(.primary)
-                        
-                        TimePickerButton(
-                            time: $viewModel.endTime,
-                            label: viewModel.formattedEndTime
-                        )
-                    }
-                    .frame(maxWidth: .infinity)
                 }
             }
+            
+            Text("Lớp học sẽ tự động tạo lịch cho các ngày đã chọn")
+                .font(.system(size: 12))
+                .foregroundColor(.secondary)
+            
+            Divider()
+                .padding(.vertical, 8)
+            
+            // End Date Option
+            VStack(alignment: .leading, spacing: 12) {
+                Toggle(isOn: $viewModel.hasEndDate) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "calendar.badge.exclamationmark")
+                            .font(.system(size: 16))
+                            .foregroundColor(.orange)
+                        
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Ngày kết thúc")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundColor(.primary)
+                            
+                            Text("Lớp học sẽ kết thúc vào ngày này")
+                                .font(.system(size: 12))
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                }
+                .tint(.blue)
+                
+                if viewModel.hasEndDate {
+                    DatePicker(
+                        "Kết thúc vào",
+                        selection: $viewModel.endDate,
+                        in: Date()...,
+                        displayedComponents: .date
+                    )
+                    .datePickerStyle(.graphical)
+                    .padding(12)
+                    .background(Color(.systemBackground))
+                    .cornerRadius(12)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(Color(.systemGray4), lineWidth: 1)
+                    )
+                }
+            }
+        }
+    }
+    
+    // MARK: - Fixed Dates Schedule Content
+    private var fixedDatesScheduleContent: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("Chọn các ngày cố định")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(.primary)
+                
+                Spacer()
+                
+                if !viewModel.selectedFixedDates.isEmpty {
+                    Button {
+                        viewModel.clearFixedDates()
+                    } label: {
+                        Text("Xóa tất cả")
+                            .font(.system(size: 13))
+                            .foregroundColor(.red)
+                    }
+                }
+            }
+            
+            // Date Picker Button
+            FixedDatesPickerButton(
+                selectedDates: $viewModel.selectedFixedDates,
+                formattedText: viewModel.formattedFixedDates
+            )
+            
+            // Selected Dates Display
+            if !viewModel.selectedFixedDates.isEmpty {
+                selectedDatesChips
+            }
+            
+            Text("Mỗi ngày sẽ tạo một buổi học riêng biệt")
+                .font(.system(size: 12))
+                .foregroundColor(.secondary)
+        }
+    }
+    
+    // MARK: - Selected Dates Chips
+    private var selectedDatesChips: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(viewModel.selectedFixedDates.sorted(), id: \.self) { date in
+                    FixedDateChip(date: date) {
+                        viewModel.removeFixedDate(date)
+                    }
+                }
+            }
+        }
+    }
+    
+    // MARK: - Time Selection Content
+    private var timeSelectionContent: some View {
+        HStack(spacing: 16) {
+            // Start Time
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Bắt đầu")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(.primary)
+                
+                TimePickerButton(
+                    time: $viewModel.startTime,
+                    label: viewModel.formattedStartTime
+                )
+            }
+            .frame(maxWidth: .infinity)
+            
+            // End Time
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Kết thúc")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(.primary)
+                
+                TimePickerButton(
+                    time: $viewModel.endTime,
+                    label: viewModel.formattedEndTime
+                )
+            }
+            .frame(maxWidth: .infinity)
         }
     }
     
@@ -838,7 +965,312 @@ struct TimePickerSheet: View {
     }
 }
 
+// MARK: - Schedule Type Button
+struct ScheduleTypeButton: View {
+    let type: ScheduleType
+    let isSelected: Bool
+    let action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 8) {
+                Image(systemName: type.icon)
+                    .font(.system(size: 24))
+                    .foregroundColor(isSelected ? .white : .blue)
+                
+                Text(type.displayName)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(isSelected ? .white : .primary)
+                
+                Text(type.description)
+                    .font(.system(size: 11))
+                    .foregroundColor(isSelected ? .white.opacity(0.8) : .secondary)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(2)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 16)
+            .padding(.horizontal, 12)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(isSelected ? Color.blue : Color(.systemBackground))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(isSelected ? Color.blue : Color(.systemGray4), lineWidth: isSelected ? 2 : 1)
+            )
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+}
+
+// MARK: - Fixed Dates Picker Button
+struct FixedDatesPickerButton: View {
+    @Binding var selectedDates: [Date]
+    let formattedText: String
+    
+    @State private var showPicker = false
+    
+    var body: some View {
+        Button {
+            showPicker = true
+        } label: {
+            HStack {
+                Image(systemName: "calendar.badge.plus")
+                    .font(.system(size: 18))
+                    .foregroundColor(.blue)
+                
+                Text(formattedText)
+                    .font(.system(size: 16))
+                    .foregroundColor(selectedDates.isEmpty ? .secondary : .primary)
+                
+                Spacer()
+                
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 14))
+                    .foregroundColor(.secondary)
+            }
+            .padding(16)
+            .background(Color(.systemBackground))
+            .cornerRadius(12)
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(Color(.systemGray4), lineWidth: 1)
+            )
+        }
+        .buttonStyle(PlainButtonStyle())
+        .sheet(isPresented: $showPicker) {
+            FixedDatesPickerSheet(selectedDates: $selectedDates)
+        }
+    }
+}
+
+// MARK: - Fixed Dates Picker Sheet
+struct FixedDatesPickerSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @Binding var selectedDates: [Date]
+    @State private var currentMonth: Date = Date()
+    
+    private let calendar = Calendar.current
+    
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 16) {
+                // Month Navigation
+                HStack {
+                    Button {
+                        previousMonth()
+                    } label: {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundColor(.blue)
+                            .frame(width: 44, height: 44)
+                    }
+                    
+                    Spacer()
+                    
+                    Text(currentMonthYear)
+                        .font(.system(size: 18, weight: .bold))
+                        .foregroundColor(.primary)
+                    
+                    Spacer()
+                    
+                    Button {
+                        nextMonth()
+                    } label: {
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundColor(.blue)
+                            .frame(width: 44, height: 44)
+                    }
+                }
+                .padding(.horizontal)
+                
+                // Weekday Header
+                HStack(spacing: 0) {
+                    ForEach(["CN", "T2", "T3", "T4", "T5", "T6", "T7"], id: \.self) { symbol in
+                        Text(symbol)
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(.secondary)
+                            .frame(maxWidth: .infinity)
+                    }
+                }
+                .padding(.horizontal)
+                
+                // Calendar Grid
+                let columns = Array(repeating: GridItem(.flexible(), spacing: 4), count: 7)
+                
+                LazyVGrid(columns: columns, spacing: 8) {
+                    ForEach(calendarDays.indices, id: \.self) { index in
+                        if let date = calendarDays[index] {
+                            FixedDateCell(
+                                date: date,
+                                isSelected: isDateSelected(date),
+                                isToday: calendar.isDateInToday(date),
+                                isPast: date < calendar.startOfDay(for: Date())
+                            )
+                            .onTapGesture {
+                                toggleDate(date)
+                            }
+                        } else {
+                            Color.clear
+                                .frame(height: 44)
+                        }
+                    }
+                }
+                .padding(.horizontal)
+                
+                // Selected Dates Count
+                if !selectedDates.isEmpty {
+                    HStack {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundColor(.green)
+                        Text("Đã chọn \(selectedDates.count) ngày")
+                            .font(.system(size: 15, weight: .medium))
+                            .foregroundColor(.primary)
+                    }
+                    .padding(.top, 8)
+                }
+                
+                Spacer()
+            }
+            .padding(.top)
+            .navigationTitle("Chọn ngày")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Hủy") {
+                        dismiss()
+                    }
+                }
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Xong") {
+                        dismiss()
+                    }
+                    .fontWeight(.semibold)
+                }
+            }
+        }
+    }
+    
+    private var currentMonthYear: String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "vi_VN")
+        formatter.dateFormat = "MMMM yyyy"
+        return formatter.string(from: currentMonth).capitalized
+    }
+    
+    private var calendarDays: [Date?] {
+        var days: [Date?] = []
+        
+        let startOfMonth = calendar.date(from: calendar.dateComponents([.year, .month], from: currentMonth))!
+        let range = calendar.range(of: .day, in: .month, for: currentMonth)!
+        
+        let firstWeekday = calendar.component(.weekday, from: startOfMonth)
+        
+        for _ in 1..<firstWeekday {
+            days.append(nil)
+        }
+        
+        for day in range {
+            if let date = calendar.date(byAdding: .day, value: day - 1, to: startOfMonth) {
+                days.append(date)
+            }
+        }
+        
+        return days
+    }
+    
+    private func previousMonth() {
+        currentMonth = calendar.date(byAdding: .month, value: -1, to: currentMonth) ?? currentMonth
+    }
+    
+    private func nextMonth() {
+        currentMonth = calendar.date(byAdding: .month, value: 1, to: currentMonth) ?? currentMonth
+    }
+    
+    private func isDateSelected(_ date: Date) -> Bool {
+        selectedDates.contains { calendar.isDate($0, inSameDayAs: date) }
+    }
+    
+    private func toggleDate(_ date: Date) {
+        // Don't allow past dates
+        guard date >= calendar.startOfDay(for: Date()) else { return }
+        
+        if let index = selectedDates.firstIndex(where: { calendar.isDate($0, inSameDayAs: date) }) {
+            selectedDates.remove(at: index)
+        } else {
+            selectedDates.append(date)
+        }
+        selectedDates.sort()
+    }
+}
+
+// MARK: - Fixed Date Cell
+struct FixedDateCell: View {
+    let date: Date
+    let isSelected: Bool
+    let isToday: Bool
+    let isPast: Bool
+    
+    var body: some View {
+        ZStack {
+            if isSelected {
+                Circle()
+                    .fill(Color.blue)
+                    .frame(width: 40, height: 40)
+            } else if isToday {
+                Circle()
+                    .stroke(Color.blue, lineWidth: 2)
+                    .frame(width: 40, height: 40)
+            }
+            
+            Text("\(Calendar.current.component(.day, from: date))")
+                .font(.system(size: 16, weight: isSelected || isToday ? .bold : .regular))
+                .foregroundColor(
+                    isPast ? .secondary.opacity(0.5) :
+                    isSelected ? .white :
+                    isToday ? .blue : .primary
+                )
+        }
+        .frame(height: 44)
+        .opacity(isPast ? 0.5 : 1)
+    }
+}
+
+// MARK: - Fixed Date Chip
+struct FixedDateChip: View {
+    let date: Date
+    let onRemove: () -> Void
+    
+    private var formattedDate: String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "vi_VN")
+        formatter.dateFormat = "dd/MM (EEE)"
+        return formatter.string(from: date)
+    }
+    
+    var body: some View {
+        HStack(spacing: 6) {
+            Text(formattedDate)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundColor(.blue)
+            
+            Button(action: onRemove) {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 14))
+                    .foregroundColor(.blue.opacity(0.6))
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(
+            Capsule()
+                .fill(Color.blue.opacity(0.1))
+        )
+    }
+}
+
 #Preview {
     AddEventView()
 }
-

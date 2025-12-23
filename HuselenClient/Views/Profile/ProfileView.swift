@@ -119,17 +119,20 @@ struct ProfileView: View {
     // MARK: - Stats Summary
     private var statsSummary: some View {
         HStack(spacing: 0) {
-            StatItem(value: "\(viewModel.totalWorkouts)", title: "Buổi tập")
+            StatItem(value: "\(viewModel.totalCheckIns)", title: "Check-in")
             
             Divider()
                 .frame(height: 40)
             
-            StatItem(value: "\(viewModel.totalMinutes)", title: "Phút")
+            StatItem(value: "\(viewModel.totalMealLogs)", title: "Bữa ăn")
             
             Divider()
                 .frame(height: 40)
             
-            StatItem(value: "\(viewModel.totalCalories)", title: "Kcal")
+            StatItem(
+                value: viewModel.currentWeight != nil ? String(format: "%.1f", viewModel.currentWeight!) : "--",
+                title: "Cân nặng (kg)"
+            )
         }
         .padding(.vertical, 20)
         .background(

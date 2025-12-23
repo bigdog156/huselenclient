@@ -14,6 +14,7 @@ struct UserClassEnrollment: Codable, Identifiable {
     var userId: UUID
     var classEventId: UUID
     var enrolledAt: Date?
+    var startDate: Date?  // The date from which student should see events
     var status: EnrollmentStatus
     var notes: String?
     var createdAt: Date?
@@ -24,6 +25,7 @@ struct UserClassEnrollment: Codable, Identifiable {
         case userId = "user_id"
         case classEventId = "class_event_id"
         case enrolledAt = "enrolled_at"
+        case startDate = "start_date"
         case status
         case notes
         case createdAt = "created_at"
@@ -35,6 +37,7 @@ struct UserClassEnrollment: Codable, Identifiable {
         userId: UUID,
         classEventId: UUID,
         enrolledAt: Date? = nil,
+        startDate: Date? = nil,
         status: EnrollmentStatus = .active,
         notes: String? = nil,
         createdAt: Date? = nil,
@@ -44,10 +47,52 @@ struct UserClassEnrollment: Codable, Identifiable {
         self.userId = userId
         self.classEventId = classEventId
         self.enrolledAt = enrolledAt
+        self.startDate = startDate
         self.status = status
         self.notes = notes
         self.createdAt = createdAt
         self.updatedAt = updatedAt
+    }
+    
+    // Custom decoder to handle date formats
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        
+        id = try container.decodeIfPresent(UUID.self, forKey: .id)
+        userId = try container.decode(UUID.self, forKey: .userId)
+        classEventId = try container.decode(UUID.self, forKey: .classEventId)
+        status = try container.decodeIfPresent(EnrollmentStatus.self, forKey: .status) ?? .active
+        notes = try container.decodeIfPresent(String.self, forKey: .notes)
+        
+        // Handle enrolledAt (timestamp)
+        if let enrolledAtString = try container.decodeIfPresent(String.self, forKey: .enrolledAt) {
+            enrolledAt = ISO8601DateFormatter().date(from: enrolledAtString)
+        } else {
+            enrolledAt = nil
+        }
+        
+        // Handle startDate (date only: yyyy-MM-dd)
+        if let startDateString = try container.decodeIfPresent(String.self, forKey: .startDate) {
+            let formatter = DateFormatter()
+            formatter.dateFormat = "yyyy-MM-dd"
+            startDate = formatter.date(from: startDateString)
+        } else {
+            startDate = nil
+        }
+        
+        // Handle createdAt
+        if let createdAtString = try container.decodeIfPresent(String.self, forKey: .createdAt) {
+            createdAt = ISO8601DateFormatter().date(from: createdAtString)
+        } else {
+            createdAt = nil
+        }
+        
+        // Handle updatedAt
+        if let updatedAtString = try container.decodeIfPresent(String.self, forKey: .updatedAt) {
+            updatedAt = ISO8601DateFormatter().date(from: updatedAtString)
+        } else {
+            updatedAt = nil
+        }
     }
 }
 
@@ -89,6 +134,7 @@ class CalendarViewModel: ObservableObject {
     @Published var userEnrollments: [UserClassEnrollment] = []
     @Published var enrolledClasses: [ClassEvent] = []
     @Published var userAttendances: [ClassEventAttendee] = []
+    @Published var userCheckIns: [UserCheckIn] = []
     @Published var isLoading = false
     @Published var errorMessage: String?
     
@@ -108,6 +154,9 @@ class CalendarViewModel: ObservableObject {
             
             // Also fetch user's attendances
             await loadUserAttendances(userId: userId)
+            
+            // Load user's check-ins for the month
+            await loadUserCheckIns(userId: userId)
             
             // Update selected date events
             updateSelectedDateEvents()
@@ -162,16 +211,22 @@ class CalendarViewModel: ObservableObject {
         var generatedEvents: [CalendarEvent] = []
         
         for classEvent in enrolledClasses {
+            // Find the enrollment for this class to get the start_date
+            let enrollment = userEnrollments.first { $0.classEventId == classEvent.id }
+            let enrollmentStartDate = enrollment?.startDate ?? classEvent.eventDate
+            
             if classEvent.isRecurring && !classEvent.recurringDays.isEmpty {
-                // Generate events for each recurring day in the month
+                // Generate events for each day in the month that matches recurring days
                 for dayOffset in 0..<range.count {
                     if let date = calendar.date(byAdding: .day, value: dayOffset, to: startOfMonth) {
-                        let weekday = calendar.component(.weekday, from: date) // 1 = Sunday, 2 = Monday, etc.
-                        
-                        // Check if this weekday is in recurring_days
-                        if classEvent.recurringDays.contains(weekday) {
-                            // Only show events from the start date onwards
-                            if date >= calendar.startOfDay(for: classEvent.eventDate) {
+                        // Use the occursOn method to check if event happens on this date
+                        // This handles start date, end date, and weekday matching
+                        if classEvent.occursOn(date: date) {
+                            // Also check if the date is on or after the enrollment start date
+                            let normalizedDate = calendar.startOfDay(for: date)
+                            let normalizedEnrollmentStart = calendar.startOfDay(for: enrollmentStartDate)
+                            
+                            if normalizedDate >= normalizedEnrollmentStart {
                                 let calendarEvent = CalendarEvent(
                                     classEvent: classEvent,
                                     displayDate: date,
@@ -183,8 +238,14 @@ class CalendarViewModel: ObservableObject {
                     }
                 }
             } else {
-                // Non-recurring event - only show on the specific date
-                if calendar.isDate(classEvent.eventDate, equalTo: startOfMonth, toGranularity: .month) {
+                // Non-recurring (fixed date) event - only show if:
+                // 1. The event is in the current month
+                // 2. The event date is on or after the enrollment start date
+                let eventDate = calendar.startOfDay(for: classEvent.eventDate)
+                let normalizedEnrollmentStart = calendar.startOfDay(for: enrollmentStartDate)
+                
+                if calendar.isDate(classEvent.eventDate, equalTo: startOfMonth, toGranularity: .month) 
+                    && eventDate >= normalizedEnrollmentStart {
                     let calendarEvent = CalendarEvent(
                         classEvent: classEvent,
                         displayDate: classEvent.eventDate,
@@ -245,6 +306,53 @@ class CalendarViewModel: ObservableObject {
     func nextMonth() {
         if let newDate = Calendar.current.date(byAdding: .month, value: 1, to: selectedDate) {
             selectedDate = newDate
+        }
+    }
+    
+    // MARK: - Load User Check-Ins
+    private func loadUserCheckIns(userId: String) async {
+        let calendar = Calendar.current
+        let startOfMonth = calendar.date(from: calendar.dateComponents([.year, .month], from: selectedDate))!
+        let endOfMonth = calendar.date(byAdding: DateComponents(month: 1, day: -1), to: startOfMonth)!
+        
+        // Format dates for query
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSZ"
+        
+        let startString = dateFormatter.string(from: startOfMonth)
+        let endString = dateFormatter.string(from: endOfMonth)
+        
+        do {
+            let checkIns: [UserCheckIn] = try await supabase
+                .from("user_check_ins")
+                .select()
+                .eq("user_id", value: userId)
+                .gte("check_in_time", value: startString)
+                .lte("check_in_time", value: endString)
+                .execute()
+                .value
+            
+            self.userCheckIns = checkIns
+            print("✅ Loaded \(checkIns.count) check-ins for the month")
+        } catch {
+            print("Error loading check-ins: \(error)")
+            self.userCheckIns = []
+        }
+    }
+    
+    // MARK: - Check if date has check-in
+    func hasCheckIn(on date: Date) -> Bool {
+        let calendar = Calendar.current
+        return userCheckIns.contains { checkIn in
+            calendar.isDate(checkIn.checkInTime, inSameDayAs: date)
+        }
+    }
+    
+    // MARK: - Get check-in for date
+    func getCheckIn(for date: Date) -> UserCheckIn? {
+        let calendar = Calendar.current
+        return userCheckIns.first { checkIn in
+            calendar.isDate(checkIn.checkInTime, inSameDayAs: date)
         }
     }
     

@@ -46,9 +46,7 @@ struct ManagerTabView: View {
                     case .overview:
                         ManagerHomeView(authViewModel: authViewModel)
                     case .schedule:
-                        VStack{
-                            Text("Lịch học")
-                        }
+                        ManagerCalendarView()
                     case .students:
                         StudentsListView()
                     case .profile:
