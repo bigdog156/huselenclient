@@ -9,7 +9,7 @@ import SwiftUI
 
 struct HomeView: View {
     @ObservedObject var authViewModel: AuthViewModel
-    @StateObject private var viewModel = HomeViewModel()
+    @EnvironmentObject var viewModel: HomeViewModel
     @State private var showCheckIn = false
     @State private var showTodayCheckInDetail = false
     
@@ -37,11 +37,6 @@ struct HomeView: View {
             .padding(.top, 16)
         }
         .background(Color(.systemGroupedBackground))
-        .task {
-            if let userId = authViewModel.currentUser?.id {
-                await viewModel.loadData(userId: userId.uuidString.lowercased())
-            }
-        }
         .fullScreenCover(isPresented: $showCheckIn) {
             CheckInView(
                 userId: authViewModel.currentUser?.id.uuidString.lowercased() ?? "",
@@ -1111,4 +1106,5 @@ struct TodayCheckInDetailSheet: View {
 
 #Preview {
     HomeView(authViewModel: AuthViewModel())
+        .environmentObject(HomeViewModel())
 }

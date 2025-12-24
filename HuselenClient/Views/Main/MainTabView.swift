@@ -41,7 +41,7 @@ enum MainTab: String, CaseIterable {
     
     // Tabs on right side of center button
     static var rightTabs: [MainTab] {
-        [.weight, .profile]
+        [.meal, .profile]
     }
 }
 
@@ -49,6 +49,7 @@ struct MainTabView: View {
     @ObservedObject var authViewModel: AuthViewModel
     @State private var selectedTab: MainTab = .workout
     @StateObject var profileViewModel = ProfileViewModel()
+    @StateObject var homeViewModel = HomeViewModel()
     @State private var showCheckIn = false
     
     private var userId: String {
@@ -73,6 +74,12 @@ struct MainTabView: View {
                         ProfileView(authViewModel: authViewModel)
                     }
                 }
+                .task {
+                    if let userId = authViewModel.currentUser?.id {
+                        await homeViewModel.loadData(userId: userId.uuidString.lowercased())
+                    }
+                }
+                .environmentObject(homeViewModel)
                 .environmentObject(profileViewModel)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 
