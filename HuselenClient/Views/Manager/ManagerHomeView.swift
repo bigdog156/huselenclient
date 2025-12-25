@@ -100,28 +100,21 @@ struct ManagerHomeView: View {
         Group {
             if let avatarUrl = profileViewModel.userProfile?.avatarUrl,
                let url = URL(string: avatarUrl) {
-                AsyncImage(url: url) { phase in
-                    switch phase {
-                    case .empty:
+                CachedAvatarImage(
+                    url: url,
+                    size: 56,
+                    placeholder: AnyView(
                         Circle()
                             .fill(Color(.systemGray5))
                             .overlay(ProgressView())
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                    case .failure:
-                        defaultAvatar
-                    @unknown default:
-                        defaultAvatar
-                    }
-                }
+                    )
+                )
             } else {
                 defaultAvatar
+                    .frame(width: 56, height: 56)
+                    .clipShape(Circle())
             }
         }
-        .frame(width: 56, height: 56)
-        .clipShape(Circle())
         .overlay(
             Circle()
                 .stroke(Color.white, lineWidth: 2)

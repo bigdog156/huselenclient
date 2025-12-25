@@ -193,6 +193,10 @@ class AuthViewModel: ObservableObject {
         
         do {
             try await supabase.auth.signOut()
+            
+            // Clear image cache on sign out
+            ImageCacheManager.clearCache()
+            
             self.isAuthenticated = false
             self.currentUser = nil
             self.needsOnboarding = false

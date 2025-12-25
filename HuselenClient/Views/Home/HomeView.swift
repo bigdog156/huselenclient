@@ -85,15 +85,11 @@ struct HomeView: View {
         } label: {
             if let avatarUrl = viewModel.userProfile?.avatarUrl,
                let url = URL(string: avatarUrl) {
-                AsyncImage(url: url) { image in
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                } placeholder: {
-                    defaultAvatar
-                }
-                .frame(width: 56, height: 56)
-                .clipShape(Circle())
+                CachedAvatarImage(
+                    url: url,
+                    size: 56,
+                    placeholder: AnyView(defaultAvatar)
+                )
             } else {
                 defaultAvatar
             }
@@ -458,15 +454,11 @@ struct WorkoutCard: View {
                         // Trainer Avatar
                         if let avatarUrl = trainer.avatarUrl,
                            let url = URL(string: avatarUrl) {
-                            AsyncImage(url: url) { image in
-                                image
-                                    .resizable()
-                                    .aspectRatio(contentMode: .fill)
-                            } placeholder: {
-                                trainerDefaultAvatar
-                            }
-                            .frame(width: 44, height: 44)
-                            .clipShape(Circle())
+                            CachedAvatarImage(
+                                url: url,
+                                size: 44,
+                                placeholder: AnyView(trainerDefaultAvatar)
+                            )
                         } else {
                             trainerDefaultAvatar
                         }

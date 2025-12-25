@@ -7,12 +7,14 @@
 
 import Foundation
 import Supabase
+import UIKit
 
 @MainActor
 class ProfileViewModel: ObservableObject {
     @Published var userProfile: UserProfile?
     @Published var isLoading = false
     @Published var errorMessage: String?
+    @Published var isUploadingAvatar = false
     
     // Real stats from database
     @Published var totalCheckIns = 0
@@ -114,6 +116,61 @@ class ProfileViewModel: ObservableObject {
             }
         } catch {
             print("Error loading weight stats: \(error)")
+        }
+    }
+    
+    // MARK: - Upload Avatar
+    func uploadAvatar(userId: String, image: UIImage) async -> Bool {
+        isUploadingAvatar = true
+        errorMessage = nil
+        
+        do {
+            // Compress image
+            guard let imageData = image.jpegData(compressionQuality: 0.7) else {
+                errorMessage = "Không thể nén ảnh"
+                isUploadingAvatar = false
+                return false
+            }
+            
+            // Generate unique filename
+            let fileName = "\(userId)_\(UUID().uuidString).jpg"
+            let filePath = "avatars/\(fileName)"
+            
+            // Upload to Supabase Storage
+            let data = Data(imageData)
+            try await supabase.storage
+                .from("user-avatars")
+                .upload(
+                    path: filePath,
+                    file: data,
+                    options: FileOptions(
+                        contentType: "image/jpeg",
+                        upsert: true
+                    )
+                )
+            
+            // Get public URL
+            let publicURL = try supabase.storage
+                .from("user-avatars")
+                .getPublicURL(path: filePath)
+            
+            // Update profile with new avatar URL
+            try await supabase
+                .from("profiles")
+                .update(["avatar_url": publicURL.absoluteString])
+                .eq("user_id", value: userId)
+                .execute()
+            
+            // Reload profile to get updated data
+            await loadProfile(userId: userId)
+            
+            isUploadingAvatar = false
+            return true
+        } catch {
+            print("Error uploading avatar: \(error)")
+            errorMessage = "Lỗi tải ảnh lên: \(error.localizedDescription)"
+            isUploadingAvatar = false
+            return false
         }
     }
 }

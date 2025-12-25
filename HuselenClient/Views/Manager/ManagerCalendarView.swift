@@ -571,17 +571,15 @@ struct StudentRowCard: View {
         HStack(spacing: 12) {
             // Avatar
             if let avatarUrl = student.avatarUrl, let url = URL(string: avatarUrl) {
-                AsyncImage(url: url) { image in
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                } placeholder: {
-                    defaultAvatar
-                }
-                .frame(width: 48, height: 48)
-                .clipShape(Circle())
+                CachedAvatarImage(
+                    url: url,
+                    size: 48,
+                    placeholder: AnyView(defaultAvatar)
+                )
             } else {
                 defaultAvatar
+                    .frame(width: 48, height: 48)
+                    .clipShape(Circle())
             }
             
             // Info
@@ -862,17 +860,15 @@ struct UserSelectionRow: View {
         HStack(spacing: 12) {
             // Avatar
             if let avatarUrl = user.avatarUrl, let url = URL(string: avatarUrl) {
-                AsyncImage(url: url) { image in
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                } placeholder: {
-                    defaultAvatar
-                }
-                .frame(width: 44, height: 44)
-                .clipShape(Circle())
+                CachedAvatarImage(
+                    url: url,
+                    size: 44,
+                    placeholder: AnyView(defaultAvatar)
+                )
             } else {
                 defaultAvatar
+                    .frame(width: 44, height: 44)
+                    .clipShape(Circle())
             }
             
             // Name
