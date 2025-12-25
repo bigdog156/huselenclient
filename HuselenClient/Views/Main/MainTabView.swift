@@ -144,25 +144,39 @@ struct MainTabView: View {
     // MARK: - Center Button
     private var centerButton: some View {
         Button {
-            showCheckIn = true
+            // Only allow check-in if user has a class today and hasn't checked in yet
+            if homeViewModel.hasTodayClass && !homeViewModel.hasCheckedInToday {
+                showCheckIn = true
+            }
         } label: {
             ZStack {
                 Circle()
                     .fill(
                         LinearGradient(
-                            colors: [Color.blue, Color.blue.opacity(0.8)],
+                            colors: homeViewModel.hasTodayClass && !homeViewModel.hasCheckedInToday
+                                ? [Color.blue, Color.blue.opacity(0.8)]
+                                : [Color.gray.opacity(0.6), Color.gray.opacity(0.4)],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         )
                     )
                     .frame(width: 56, height: 56)
-                    .shadow(color: Color.blue.opacity(0.3), radius: 8, x: 0, y: 4)
+                    .shadow(
+                        color: homeViewModel.hasTodayClass && !homeViewModel.hasCheckedInToday
+                            ? Color.blue.opacity(0.3)
+                            : Color.clear,
+                        radius: 8,
+                        x: 0,
+                        y: 4
+                    )
                 
-                Image(systemName: "plus")
+                Image(systemName: homeViewModel.hasCheckedInToday ? "checkmark" : "plus")
                     .font(.system(size: 24, weight: .semibold))
                     .foregroundColor(.white)
+                    .opacity(homeViewModel.hasTodayClass && !homeViewModel.hasCheckedInToday ? 1.0 : 0.5)
             }
         }
+        .disabled(!homeViewModel.hasTodayClass || homeViewModel.hasCheckedInToday)
         .frame(maxWidth: .infinity)
     }
 }

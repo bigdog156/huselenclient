@@ -11,6 +11,9 @@ struct ProfileView: View {
     @ObservedObject var authViewModel: AuthViewModel
     @EnvironmentObject var viewModel: ProfileViewModel
     @State private var showWeightTracking = false
+    @State private var showImagePicker = false
+    @State private var selectedImage: UIImage?
+    @State private var showUploadSuccess = false
     
     private var userId: String {
         authViewModel.currentUser?.id.uuidString.lowercased() ?? ""
@@ -40,6 +43,25 @@ struct ProfileView: View {
             .background(Color(.systemGroupedBackground))
             .navigationTitle("Hồ sơ")
             .navigationBarTitleDisplayMode(.inline)
+            .sheet(isPresented: $showImagePicker) {
+                ImagePicker(selectedImage: $selectedImage)
+            }
+            .alert("Thành công", isPresented: $showUploadSuccess) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text("Ảnh đại diện đã được cập nhật")
+            }
+            .onChange(of: selectedImage) { newImage in
+                if let image = newImage {
+                    Task {
+                        let success = await viewModel.uploadAvatar(userId: userId, image: image)
+                        if success {
+                            showUploadSuccess = true
+                        }
+                        selectedImage = nil
+                    }
+                }
+            }
             .task {
                 if let userId = authViewModel.currentUser?.id {
                     await viewModel.loadProfile(userId: userId.uuidString.lowercased())
@@ -51,20 +73,46 @@ struct ProfileView: View {
     // MARK: - Profile Header
     private var profileHeader: some View {
         VStack(spacing: 16) {
-            // Avatar
-            if let avatarUrl = viewModel.userProfile?.avatarUrl,
-               let url = URL(string: avatarUrl) {
-                AsyncImage(url: url) { image in
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                } placeholder: {
-                    defaultAvatar
+            // Avatar with upload overlay
+            ZStack(alignment: .bottomTrailing) {
+                Group {
+                    if let avatarUrl = viewModel.userProfile?.avatarUrl,
+                       let url = URL(string: avatarUrl) {
+                        CachedAvatarImage(
+                            url: url,
+                            size: 100,
+                            placeholder: AnyView(defaultAvatar)
+                        )
+                    } else {
+                        defaultAvatar
+                            .frame(width: 100, height: 100)
+                    }
                 }
-                .frame(width: 100, height: 100)
-                .clipShape(Circle())
-            } else {
-                defaultAvatar
+                .overlay(
+                    Circle()
+                        .stroke(Color.white, lineWidth: 3)
+                )
+                
+                // Upload button
+                Button {
+                    showImagePicker = true
+                } label: {
+                    ZStack {
+                        Circle()
+                            .fill(Color.blue)
+                            .frame(width: 32, height: 32)
+                        
+                        Image(systemName: viewModel.isUploadingAvatar ? "arrow.clockwise" : "camera.fill")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(.white)
+                            .rotationEffect(.degrees(viewModel.isUploadingAvatar ? 360 : 0))
+                            .animation(viewModel.isUploadingAvatar ? 
+                                .linear(duration: 1).repeatForever(autoreverses: false) : .default, 
+                                value: viewModel.isUploadingAvatar)
+                    }
+                }
+                .disabled(viewModel.isUploadingAvatar)
+                .offset(x: -5, y: -5)
             }
             
             // Name

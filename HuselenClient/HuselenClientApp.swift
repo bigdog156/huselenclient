@@ -9,6 +9,12 @@ import SwiftUI
 
 @main
 struct HuselenClientApp: App {
+    
+    init() {
+        // Configure Kingfisher image cache on app launch
+        ImageCacheManager.configure()
+    }
+    
     var body: some Scene {
         WindowGroup {
             ContentView()

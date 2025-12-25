@@ -7,6 +7,7 @@
 
 import SwiftUI
 import AVFoundation
+import Kingfisher
 
 struct MealLogView: View {
     @StateObject private var viewModel = MealLogViewModel()
@@ -110,6 +111,22 @@ struct MealLogView: View {
             .task {
                 viewModel.initializeWeekDates()
                 await viewModel.loadMeals(userId: userId)
+            }
+            .onAppear {
+                Task {
+                    let today = Date()
+                    // Reset to today if viewing a different date
+                    if !Calendar.current.isDate(viewModel.selectedDate, inSameDayAs: today) {
+                        viewModel.selectedDate = today
+                    }
+                    // Always reload meals for the selected date to ensure fresh data
+                    await viewModel.loadMeals(userId: userId, for: viewModel.selectedDate)
+                }
+            }
+            .onChange(of: viewModel.selectedDate) { newDate in
+                Task {
+                    await viewModel.loadMeals(userId: userId, for: newDate)
+                }
             }
             .sheet(isPresented: $showCamera) {
                 if let mealType = captureForMealType {
@@ -237,6 +254,7 @@ struct MealSectionView: View {
                     note: log.note,
                     onDelete: onDelete
                 )
+                .id("\(log.id ?? UUID().uuidString)-\(photoUrl)")
             } else {
                 // Empty state - Photo capture area (1:1 ratio)
                 Button {
@@ -394,37 +412,25 @@ struct LocketStylePhotoCard: View {
         ZStack(alignment: .topTrailing) {
             // Photo with 1:1 aspect ratio
             GeometryReader { geometry in
-                AsyncImage(url: url) { phase in
-                    switch phase {
-                    case .empty:
+                KFImage.url(url)
+                    .placeholder {
                         Rectangle()
                             .fill(Color(.systemGray5))
                             .overlay(
                                 ProgressView()
                                     .progressViewStyle(CircularProgressViewStyle())
                             )
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                            .frame(width: geometry.size.width, height: geometry.size.width)
-                            .clipped()
-                    case .failure:
-                        Rectangle()
-                            .fill(Color(.systemGray5))
-                            .overlay(
-                                Image(systemName: "photo")
-                                    .font(.system(size: 40))
-                                    .foregroundColor(.secondary)
-                            )
-                    @unknown default:
-                        EmptyView()
                     }
-                }
-                .frame(width: geometry.size.width, height: geometry.size.width)
-                .clipShape(RoundedRectangle(cornerRadius: 24))
-                // Locket style shadow
-                .shadow(color: Color.black.opacity(0.1), radius: 10, x: 0, y: 5)
+                    .setProcessor(DownsamplingImageProcessor(size: CGSize(width: 400, height: 400)))
+                    .cacheMemoryOnly(false)
+                    .fade(duration: 0.25)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(width: geometry.size.width, height: geometry.size.width)
+                    .clipped()
+                    .clipShape(RoundedRectangle(cornerRadius: 24))
+                    // Locket style shadow
+                    .shadow(color: Color.black.opacity(0.1), radius: 10, x: 0, y: 5)
             }
             .aspectRatio(1, contentMode: .fit)
             
@@ -504,6 +510,7 @@ struct DinnerSectionView: View {
                         note: log.note,
                         onDelete: onDelete
                     )
+                    .id("\(log.id ?? UUID().uuidString)-\(photoUrl)")
                 } else if isExpanded {
                     // Photo capture button - 1:1 style
                     Button {
