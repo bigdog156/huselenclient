@@ -21,7 +21,6 @@ class WeightTrackingViewModel: ObservableObject {
     
     // Input state
     @Published var inputWeight: String = ""
-    @Published var capturedPhoto: UIImage?
     
     // Week limit tracking
     @Published var logsThisWeek: Int = 0
@@ -114,7 +113,7 @@ class WeightTrackingViewModel: ObservableObject {
     }
     
     // MARK: - Save Weight Log
-    func saveWeightLog(userId: String, weight: Double, photo: UIImage?) async -> Bool {
+    func saveWeightLog(userId: String, weight: Double) async -> Bool {
         guard canLogMoreThisWeek else {
             errorMessage = "Bạn đã đạt giới hạn 2 lần/tuần"
             return false
@@ -125,33 +124,12 @@ class WeightTrackingViewModel: ObservableObject {
         saveSuccess = false
         
         do {
-            var photoUrl: String? = nil
-            
-            // Upload photo if exists
-            if let photo = photo,
-               let imageData = photo.jpegData(compressionQuality: 0.7) {
-                let fileName = "\(userId)/weight_\(Date().timeIntervalSince1970).jpg"
-                
-                try await supabase.storage
-                    .from("weight-photos")
-                    .upload(
-                        path: fileName,
-                        file: imageData,
-                        options: FileOptions(contentType: "image/jpeg")
-                    )
-                
-                photoUrl = try supabase.storage
-                    .from("weight-photos")
-                    .getPublicURL(path: fileName)
-                    .absoluteString
-            }
-            
             // Create weight log
             let weightLog = UserWeightLog(
                 userId: userId,
                 weightKg: weight,
-                photoUrl: photoUrl,
-                inputType: photo != nil ? .photo : .manual,
+                photoUrl: nil,
+                inputType: .manual,
                 loggedDate: Date()
             )
             
@@ -165,7 +143,6 @@ class WeightTrackingViewModel: ObservableObject {
             
             // Reset input
             inputWeight = ""
-            capturedPhoto = nil
             saveSuccess = true
             isSaving = false
             
@@ -211,7 +188,6 @@ class WeightTrackingViewModel: ObservableObject {
     // MARK: - Reset State
     func resetInput() {
         inputWeight = ""
-        capturedPhoto = nil
         errorMessage = nil
         saveSuccess = false
     }

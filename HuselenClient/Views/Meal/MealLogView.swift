@@ -10,9 +10,8 @@ import AVFoundation
 
 struct MealLogView: View {
     @StateObject private var viewModel = MealLogViewModel()
-    @State private var showCamera = false
     @State private var showDatePicker = false
-    @State private var captureForMealType: MealType? = .breakfast
+    @State private var captureForMealType: MealType?
     
     let userId: String
     
@@ -34,7 +33,6 @@ struct MealLogView: View {
                                 mealLog: viewModel.mealLogs[mealType],
                                 onTapPhoto: {
                                     captureForMealType = mealType
-                                    showCamera = true
                                 },
                                 onSaveNote: { note in
                                     Task {
@@ -60,7 +58,6 @@ struct MealLogView: View {
                             mealLog: viewModel.mealLogs[.dinner],
                             onTapPhoto: {
                                 captureForMealType = .dinner
-                                showCamera = true
                             },
                             onSaveNote: { note in
                                 Task {
@@ -111,24 +108,26 @@ struct MealLogView: View {
                 viewModel.initializeWeekDates()
                 await viewModel.loadMeals(userId: userId)
             }
-            .sheet(isPresented: $showCamera) {
-                if let mealType = captureForMealType {
-                    MealPhotoCapture(
-                        mealType: mealType,
-                        isPresented: $showCamera,
-                        onCapture: { image in
-                            Task {
-                                await viewModel.saveMealLog(
-                                    userId: userId,
-                                    mealType: mealType,
-                                    photo: image,
-                                    note: nil,
-                                    feeling: nil
-                                )
-                            }
+            .sheet(item: $captureForMealType) { mealType in
+                MealPhotoCapture(
+                    mealType: mealType,
+                    onCapture: { image in
+                        let selectedMealType = mealType
+                        captureForMealType = nil
+                        Task {
+                            await viewModel.saveMealLog(
+                                userId: userId,
+                                mealType: selectedMealType,
+                                photo: image,
+                                note: nil,
+                                feeling: nil
+                            )
                         }
-                    )
-                }
+                    },
+                    onDismiss: {
+                        captureForMealType = nil
+                    }
+                )
             }
             .sheet(isPresented: $showDatePicker) {
                 DatePickerSheet(
@@ -561,13 +560,15 @@ struct DinnerSectionView: View {
 // MARK: - Meal Photo Capture (Locket Style)
 struct MealPhotoCapture: View {
     let mealType: MealType
-    @Binding var isPresented: Bool
     let onCapture: (UIImage) -> Void
+    let onDismiss: () -> Void
     
     @StateObject private var cameraManager = MealCameraManager()
     @State private var capturedImage: UIImage?
     @State private var showPreview = false
     @State private var cameraReady = false
+    @State private var isCapturing = false
+    @State private var isSaving = false
     
     var body: some View {
         ZStack {
@@ -631,7 +632,7 @@ struct MealPhotoCapture: View {
                     // Top bar
                     HStack {
                         Button {
-                            isPresented = false
+                            onDismiss()
                         } label: {
                             Image(systemName: "xmark")
                                 .font(.system(size: 18, weight: .semibold))
@@ -676,7 +677,9 @@ struct MealPhotoCapture: View {
                     
                     // Capture button
                     Button {
+                        isCapturing = true
                         cameraManager.capturePhoto { image in
+                            isCapturing = false
                             if let image = image {
                                 // First normalize orientation, then crop
                                 let normalizedImage = normalizeImageOrientation(image)
@@ -701,12 +704,18 @@ struct MealPhotoCapture: View {
                                 .stroke(Color.white, lineWidth: 4)
                                 .frame(width: 75, height: 75)
                             
-                            Circle()
-                                .fill(Color.white)
-                                .frame(width: 60, height: 60)
+                            if isCapturing {
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                    .scaleEffect(1.5)
+                            } else {
+                                Circle()
+                                    .fill(Color.white)
+                                    .frame(width: 60, height: 60)
+                            }
                         }
                     }
-                    .disabled(!cameraReady)
+                    .disabled(!cameraReady || isCapturing)
                     .padding(.bottom, 50)
                 }
             }
@@ -747,7 +756,7 @@ struct MealPhotoCapture: View {
                     Spacer()
                     
                     Button {
-                        isPresented = false
+                        onDismiss()
                     } label: {
                         Image(systemName: "xmark")
                             .font(.system(size: 18, weight: .semibold))
@@ -777,13 +786,18 @@ struct MealPhotoCapture: View {
                 
                 // Confirm button
                 Button {
+                    isSaving = true
                     onCapture(image)
-                    isPresented = false
                 } label: {
                     HStack(spacing: 10) {
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.system(size: 20))
-                        Text("Sử dụng ảnh này")
+                        if isSaving {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                        } else {
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.system(size: 20))
+                        }
+                        Text(isSaving ? "Đang lưu..." : "Sử dụng ảnh này")
                             .font(.system(size: 17, weight: .semibold))
                     }
                     .foregroundColor(.white)
@@ -791,9 +805,10 @@ struct MealPhotoCapture: View {
                     .padding(.vertical, 16)
                     .background(
                         RoundedRectangle(cornerRadius: 16)
-                            .fill(Color.blue)
+                            .fill(isSaving ? Color.blue.opacity(0.7) : Color.blue)
                     )
                 }
+                .disabled(isSaving)
                 .padding(.horizontal, 20)
                 .padding(.bottom, 50)
             }

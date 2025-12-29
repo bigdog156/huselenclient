@@ -821,7 +821,7 @@ struct StreakCard: View {
             VStack(spacing: 12) {
                 HStack(spacing: 20) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Hi\u{1ec7}n t\u{1ea1}i")
+                        Text("Now")
                             .font(.system(size: 12))
                             .foregroundColor(.secondary)
                         
@@ -830,7 +830,7 @@ struct StreakCard: View {
                                 .font(.system(size: 24, weight: .bold))
                                 .foregroundColor(.orange)
                             
-                            Text("ng\u{00e0}y")
+                            Text("days")
                                 .font(.system(size: 14, weight: .medium))
                                 .foregroundColor(.secondary)
                         }
@@ -839,7 +839,7 @@ struct StreakCard: View {
                     Spacer()
                     
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("K\u{1ec9} l\u{1ee5}c")
+                        Text("Streak")
                             .font(.system(size: 12))
                             .foregroundColor(.secondary)
                         
@@ -848,7 +848,7 @@ struct StreakCard: View {
                                 .font(.system(size: 24, weight: .bold))
                                 .foregroundColor(.red)
                             
-                            Text("ng\u{00e0}y")
+                            Text("days")
                                 .font(.system(size: 14, weight: .medium))
                                 .foregroundColor(.secondary)
                         }
@@ -936,7 +936,6 @@ struct TodayCheckInDetailSheet: View {
                                     .resizable()
                                     .aspectRatio(contentMode: .fill)
                                     .frame(maxWidth: .infinity)
-                                    .frame(height: 350)
                                     .clipShape(RoundedRectangle(cornerRadius: 16))
                                     .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 4)
                             } else {

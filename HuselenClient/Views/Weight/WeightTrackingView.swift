@@ -11,7 +11,6 @@ import Charts
 struct WeightTrackingView: View {
     @Environment(\.dismiss) private var dismiss
     @StateObject private var viewModel = WeightTrackingViewModel()
-    @State private var showCamera = false
     
     let userId: String
     
@@ -49,12 +48,6 @@ struct WeightTrackingView: View {
             }
             .task {
                 await viewModel.loadWeightLogs(userId: userId)
-            }
-            .sheet(isPresented: $showCamera) {
-                WeightPhotoCapture(
-                    capturedImage: $viewModel.capturedPhoto,
-                    isPresented: $showCamera
-                )
             }
             .alert("Lỗi", isPresented: .init(
                 get: { viewModel.errorMessage != nil },
@@ -112,94 +105,39 @@ struct WeightTrackingView: View {
                 .frame(height: 1)
                 .frame(maxWidth: 220)
             
-            // Action Buttons
-            HStack(spacing: 12) {
-                // Camera Button
-                Button {
-                    showCamera = true
-                } label: {
-                    HStack(spacing: 8) {
-                        Image(systemName: "camera.fill")
-                            .font(.system(size: 16))
-                        Text("Chụp hình")
-                            .font(.system(size: 15, weight: .medium))
+            // Save Button
+            Button {
+                Task {
+                    if let weight = viewModel.validateWeight(viewModel.inputWeight) {
+                        await viewModel.saveWeightLog(
+                            userId: userId,
+                            weight: weight
+                        )
+                    } else {
+                        viewModel.errorMessage = "Vui lòng nhập cân nặng hợp lệ (20-300 kg)"
                     }
-                    .foregroundColor(.primary)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 14)
-                    .background(
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(Color(.systemGray6))
-                    )
                 }
-                .disabled(!viewModel.canLogMoreThisWeek)
-                .opacity(viewModel.canLogMoreThisWeek ? 1 : 0.5)
-                
-                // Save Button
-                Button {
-                    Task {
-                        if let weight = viewModel.validateWeight(viewModel.inputWeight) {
-                            await viewModel.saveWeightLog(
-                                userId: userId,
-                                weight: weight,
-                                photo: viewModel.capturedPhoto
-                            )
-                        } else {
-                            viewModel.errorMessage = "Vui lòng nhập cân nặng hợp lệ (20-300 kg)"
-                        }
-                    }
-                } label: {
-                    HStack(spacing: 8) {
-                        if viewModel.isSaving {
-                            ProgressView()
-                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                        } else {
-                            Image(systemName: "square.and.arrow.down.fill")
-                                .font(.system(size: 16))
-                            Text("Lưu số đo")
-                                .font(.system(size: 15, weight: .semibold))
-                        }
-                    }
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 14)
-                    .background(
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(viewModel.canLogMoreThisWeek ? Color.blue : Color.gray)
-                    )
-                }
-                .disabled(!viewModel.canLogMoreThisWeek || viewModel.isSaving || viewModel.inputWeight.isEmpty)
-            }
-            
-            // Photo preview if captured
-            if let photo = viewModel.capturedPhoto {
+            } label: {
                 HStack(spacing: 8) {
-                    Image(uiImage: photo)
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                        .frame(width: 50, height: 50)
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                    
-                    Text("Ảnh đã chụp")
-                        .font(.system(size: 13))
-                        .foregroundColor(.secondary)
-                    
-                    Spacer()
-                    
-                    Button {
-                        viewModel.capturedPhoto = nil
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 20))
-                            .foregroundColor(.secondary)
+                    if viewModel.isSaving {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                    } else {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 18))
+                        Text("Lưu cân nặng")
+                            .font(.system(size: 16, weight: .semibold))
                     }
                 }
-                .padding(12)
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 16)
                 .background(
-                    RoundedRectangle(cornerRadius: 10)
-                        .fill(Color(.systemGray6))
+                    RoundedRectangle(cornerRadius: 14)
+                        .fill(viewModel.canLogMoreThisWeek && !viewModel.inputWeight.isEmpty ? Color.blue : Color.gray)
                 )
             }
+            .disabled(!viewModel.canLogMoreThisWeek || viewModel.isSaving || viewModel.inputWeight.isEmpty)
         }
         .padding(20)
         .background(
@@ -371,12 +309,12 @@ struct WeightHistoryRow: View {
             // Icon
             ZStack {
                 RoundedRectangle(cornerRadius: 10)
-                    .fill(log.inputType == .photo ? Color.blue.opacity(0.1) : Color.gray.opacity(0.1))
+                    .fill(Color.blue.opacity(0.1))
                     .frame(width: 44, height: 44)
                 
-                Image(systemName: log.inputType == .photo ? "calendar" : "pencil.line")
+                Image(systemName: "scalemass.fill")
                     .font(.system(size: 18))
-                    .foregroundColor(log.inputType == .photo ? .blue : .gray)
+                    .foregroundColor(.blue)
             }
             
             // Date info
@@ -385,7 +323,7 @@ struct WeightHistoryRow: View {
                     .font(.system(size: 15, weight: .medium))
                     .foregroundColor(.primary)
                 
-                Text(log.inputType?.displayName ?? "Nhập thủ công")
+                Text("Cập nhật cân nặng")
                     .font(.system(size: 13))
                     .foregroundColor(.secondary)
             }
@@ -409,199 +347,6 @@ struct WeightHistoryRow: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 14)
-    }
-}
-
-// MARK: - Weight Photo Capture
-struct WeightPhotoCapture: View {
-    @Binding var capturedImage: UIImage?
-    @Binding var isPresented: Bool
-    @StateObject private var cameraManager = WeightCameraManager()
-    
-    var body: some View {
-        ZStack {
-            // Camera Preview
-            WeightCameraPreview(session: cameraManager.session)
-                .ignoresSafeArea()
-            
-            // Overlay
-            VStack {
-                // Top bar
-                HStack {
-                    Button {
-                        isPresented = false
-                    } label: {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 20, weight: .medium))
-                            .foregroundColor(.white)
-                            .frame(width: 44, height: 44)
-                            .background(Circle().fill(Color.black.opacity(0.3)))
-                    }
-                    
-                    Spacer()
-                    
-                    Text("Chụp ảnh cân")
-                        .font(.system(size: 17, weight: .semibold))
-                        .foregroundColor(.white)
-                    
-                    Spacer()
-                    
-                    Color.clear.frame(width: 44, height: 44)
-                }
-                .padding(.horizontal, 20)
-                .padding(.top, 60)
-                
-                Spacer()
-                
-                // Guide text
-                Text("Hướng camera vào màn hình cân")
-                    .font(.system(size: 15))
-                    .foregroundColor(.white.opacity(0.8))
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 10)
-                    .background(
-                        Capsule()
-                            .fill(Color.black.opacity(0.4))
-                    )
-                
-                Spacer()
-                
-                // Capture button
-                Button {
-                    cameraManager.capturePhoto { image in
-                        if let image = image {
-                            capturedImage = image
-                            isPresented = false
-                        }
-                    }
-                } label: {
-                    ZStack {
-                        Circle()
-                            .stroke(Color.white, lineWidth: 4)
-                            .frame(width: 80, height: 80)
-                        
-                        Circle()
-                            .fill(Color.white)
-                            .frame(width: 64, height: 64)
-                    }
-                }
-                .padding(.bottom, 50)
-            }
-        }
-        .onDisappear {
-            cameraManager.stopSession()
-        }
-    }
-}
-
-// MARK: - Weight Camera Manager
-import AVFoundation
-
-class WeightCameraManager: NSObject, ObservableObject {
-    @Published var session = AVCaptureSession()
-    private var photoOutput = AVCapturePhotoOutput()
-    private var captureCompletion: ((UIImage?) -> Void)?
-    
-    override init() {
-        super.init()
-        setupCamera()
-    }
-    
-    func setupCamera() {
-        session.beginConfiguration()
-        session.sessionPreset = .photo
-        
-        guard let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back),
-              let input = try? AVCaptureDeviceInput(device: device) else {
-            session.commitConfiguration()
-            return
-        }
-        
-        if session.canAddInput(input) {
-            session.addInput(input)
-        }
-        
-        if session.canAddOutput(photoOutput) {
-            session.addOutput(photoOutput)
-        }
-        
-        session.commitConfiguration()
-        
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            self?.session.startRunning()
-        }
-    }
-    
-    func capturePhoto(completion: @escaping (UIImage?) -> Void) {
-        captureCompletion = completion
-        let settings = AVCapturePhotoSettings()
-        photoOutput.capturePhoto(with: settings, delegate: self)
-    }
-    
-    func stopSession() {
-        if session.isRunning {
-            DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-                self?.session.stopRunning()
-            }
-        }
-    }
-}
-
-extension WeightCameraManager: AVCapturePhotoCaptureDelegate {
-    func photoOutput(_ output: AVCapturePhotoOutput, didFinishProcessingPhoto photo: AVCapturePhoto, error: Error?) {
-        guard let data = photo.fileDataRepresentation(),
-              let image = UIImage(data: data) else {
-            DispatchQueue.main.async {
-                self.captureCompletion?(nil)
-            }
-            return
-        }
-        
-        DispatchQueue.main.async {
-            self.captureCompletion?(image)
-        }
-    }
-}
-
-// MARK: - Weight Camera Preview
-struct WeightCameraPreview: UIViewRepresentable {
-    let session: AVCaptureSession
-    
-    func makeUIView(context: Context) -> WeightCameraPreviewUIView {
-        let view = WeightCameraPreviewUIView()
-        view.session = session
-        return view
-    }
-    
-    func updateUIView(_ uiView: WeightCameraPreviewUIView, context: Context) {
-        uiView.session = session
-    }
-}
-
-class WeightCameraPreviewUIView: UIView {
-    var session: AVCaptureSession? {
-        didSet {
-            guard let session = session else { return }
-            
-            DispatchQueue.main.async {
-                if self.previewLayer == nil {
-                    let layer = AVCaptureVideoPreviewLayer(session: session)
-                    layer.videoGravity = .resizeAspectFill
-                    layer.frame = self.bounds
-                    self.layer.addSublayer(layer)
-                    self.previewLayer = layer
-                } else {
-                    self.previewLayer?.session = session
-                }
-            }
-        }
-    }
-    
-    private var previewLayer: AVCaptureVideoPreviewLayer?
-    
-    override func layoutSubviews() {
-        super.layoutSubviews()
-        previewLayer?.frame = bounds
     }
 }
 

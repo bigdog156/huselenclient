@@ -142,27 +142,37 @@ struct MainTabView: View {
     }
     
     // MARK: - Center Button
+    private var canCheckIn: Bool {
+        homeViewModel.hasTodayClass && !homeViewModel.hasCheckedInToday
+    }
+    
     private var centerButton: some View {
         Button {
-            showCheckIn = true
+            if canCheckIn {
+                showCheckIn = true
+            }
         } label: {
             ZStack {
                 Circle()
                     .fill(
                         LinearGradient(
-                            colors: [Color.blue, Color.blue.opacity(0.8)],
+                            colors: canCheckIn 
+                                ? [Color.blue, Color.blue.opacity(0.8)]
+                                : [Color.gray, Color.gray.opacity(0.8)],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         )
                     )
                     .frame(width: 56, height: 56)
-                    .shadow(color: Color.blue.opacity(0.3), radius: 8, x: 0, y: 4)
+                    .shadow(color: canCheckIn ? Color.blue.opacity(0.3) : Color.gray.opacity(0.2), radius: 8, x: 0, y: 4)
                 
-                Image(systemName: "plus")
+                Image(systemName: canCheckIn ? "plus" : (homeViewModel.hasCheckedInToday ? "checkmark" : "calendar.badge.clock"))
                     .font(.system(size: 24, weight: .semibold))
                     .foregroundColor(.white)
             }
         }
+        .disabled(!canCheckIn)
+        .opacity(canCheckIn ? 1 : 0.6)
         .frame(maxWidth: .infinity)
     }
 }

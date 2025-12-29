@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		169EED8A2F00D78F00BDA150 /* Kingfisher in Frameworks */ = {isa = PBXBuildFile; productRef = 169EED892F00D78F00BDA150 /* Kingfisher */; };
 		5828C51B2EF2644F00F0FCDA /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = 5828C4E12EF2650000F0FCDA /* Supabase */; };
 /* End PBXBuildFile section */
 
@@ -56,6 +57,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				169EED8A2F00D78F00BDA150 /* Kingfisher in Frameworks */,
 				5828C51B2EF2644F00F0FCDA /* Supabase in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -118,6 +120,7 @@
 			name = HuselenClient;
 			packageProductDependencies = (
 				5828C4E12EF2650000F0FCDA /* Supabase */,
+				169EED892F00D78F00BDA150 /* Kingfisher */,
 			);
 			productName = HuselenClient;
 			productReference = 5828C4AF2EF2639900F0FCDA /* HuselenClient.app */;
@@ -203,6 +206,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				5828C4E02EF2650000F0FCDA /* XCRemoteSwiftPackageReference "supabase-swift" */,
+				169EED882F00D78F00BDA150 /* XCRemoteSwiftPackageReference "Kingfisher" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 5828C4B02EF2639900F0FCDA /* Products */;
@@ -604,6 +608,14 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		169EED882F00D78F00BDA150 /* XCRemoteSwiftPackageReference "Kingfisher" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/onevcat/Kingfisher.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 8.6.2;
+			};
+		};
 		5828C4E02EF2650000F0FCDA /* XCRemoteSwiftPackageReference "supabase-swift" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/supabase/supabase-swift.git";
@@ -615,6 +627,11 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		169EED892F00D78F00BDA150 /* Kingfisher */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 169EED882F00D78F00BDA150 /* XCRemoteSwiftPackageReference "Kingfisher" */;
+			productName = Kingfisher;
+		};
 		5828C4E12EF2650000F0FCDA /* Supabase */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 5828C4E02EF2650000F0FCDA /* XCRemoteSwiftPackageReference "supabase-swift" */;

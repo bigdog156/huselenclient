@@ -852,7 +852,6 @@ struct CheckInDetailSheet: View {
                                     .resizable()
                                     .aspectRatio(contentMode: .fill)
                                     .frame(maxWidth: .infinity)
-                                    .frame(height: 300)
                                     .clipShape(RoundedRectangle(cornerRadius: 16))
                             } else {
                                 ZStack {
