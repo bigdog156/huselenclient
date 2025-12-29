@@ -107,6 +107,12 @@ struct UserProfile: Codable {
     var createdAt: Date?
     var updatedAt: Date?
     
+    // Nutrition goals
+    var dailyCalorieGoal: Int?
+    var dailyProteinGoal: Int?
+    var dailyCarbsGoal: Int?
+    var dailyFatGoal: Int?
+    
     enum CodingKeys: String, CodingKey {
         case id
         case userId = "user_id"
@@ -122,6 +128,10 @@ struct UserProfile: Codable {
         case role
         case createdAt = "created_at"
         case updatedAt = "updated_at"
+        case dailyCalorieGoal = "daily_calorie_goal"
+        case dailyProteinGoal = "daily_protein_goal"
+        case dailyCarbsGoal = "daily_carbs_goal"
+        case dailyFatGoal = "daily_fat_goal"
     }
     
     init(
@@ -138,7 +148,11 @@ struct UserProfile: Codable {
         onboardingCompleted: Bool = false,
         role: String? = nil,
         createdAt: Date? = nil,
-        updatedAt: Date? = nil
+        updatedAt: Date? = nil,
+        dailyCalorieGoal: Int? = nil,
+        dailyProteinGoal: Int? = nil,
+        dailyCarbsGoal: Int? = nil,
+        dailyFatGoal: Int? = nil
     ) {
         self.id = id
         self.userId = userId
@@ -154,6 +168,10 @@ struct UserProfile: Codable {
         self.role = role
         self.createdAt = createdAt
         self.updatedAt = updatedAt
+        self.dailyCalorieGoal = dailyCalorieGoal
+        self.dailyProteinGoal = dailyProteinGoal
+        self.dailyCarbsGoal = dailyCarbsGoal
+        self.dailyFatGoal = dailyFatGoal
     }
     
     // Custom decoder to handle different date formats
@@ -171,6 +189,12 @@ struct UserProfile: Codable {
         weight = try container.decodeIfPresent(Double.self, forKey: .weight)
         onboardingCompleted = try container.decodeIfPresent(Bool.self, forKey: .onboardingCompleted) ?? false
         role = try container.decodeIfPresent(String.self, forKey: .role)
+        
+        // Decode nutrition goals
+        dailyCalorieGoal = try container.decodeIfPresent(Int.self, forKey: .dailyCalorieGoal)
+        dailyProteinGoal = try container.decodeIfPresent(Int.self, forKey: .dailyProteinGoal)
+        dailyCarbsGoal = try container.decodeIfPresent(Int.self, forKey: .dailyCarbsGoal)
+        dailyFatGoal = try container.decodeIfPresent(Int.self, forKey: .dailyFatGoal)
         
         // Handle birth_date (simple date format: yyyy-MM-dd)
         if let birthDateString = try container.decodeIfPresent(String.self, forKey: .birthDate) {
@@ -207,6 +231,12 @@ struct UserProfile: Codable {
         try container.encodeIfPresent(height, forKey: .height)
         try container.encodeIfPresent(weight, forKey: .weight)
         try container.encode(onboardingCompleted, forKey: .onboardingCompleted)
+        
+        // Encode nutrition goals
+        try container.encodeIfPresent(dailyCalorieGoal, forKey: .dailyCalorieGoal)
+        try container.encodeIfPresent(dailyProteinGoal, forKey: .dailyProteinGoal)
+        try container.encodeIfPresent(dailyCarbsGoal, forKey: .dailyCarbsGoal)
+        try container.encodeIfPresent(dailyFatGoal, forKey: .dailyFatGoal)
         
         // Encode birth_date as simple date string
         if let birthDate = birthDate {

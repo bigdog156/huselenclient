@@ -130,6 +130,14 @@ struct UserMealLog: Codable, Identifiable {
     var loggedTime: String?
     var createdAt: Date?
     
+    // Nutrition fields
+    var calories: Int?
+    var proteinG: Double?
+    var carbsG: Double?
+    var fatG: Double?
+    var fiberG: Double?
+    var foodItems: [FoodItem]?
+    
     enum CodingKeys: String, CodingKey {
         case id
         case userId = "user_id"
@@ -141,6 +149,12 @@ struct UserMealLog: Codable, Identifiable {
         case loggedDate = "logged_date"
         case loggedTime = "logged_time"
         case createdAt = "created_at"
+        case calories
+        case proteinG = "protein_g"
+        case carbsG = "carbs_g"
+        case fatG = "fat_g"
+        case fiberG = "fiber_g"
+        case foodItems = "food_items"
     }
     
     // MARK: - Formatted Time
@@ -176,6 +190,14 @@ struct UserMealLog: Codable, Identifiable {
         energyLevel = try container.decodeIfPresent(String.self, forKey: .energyLevel)
         loggedTime = try container.decodeIfPresent(String.self, forKey: .loggedTime)
         
+        // Nutrition fields
+        calories = try container.decodeIfPresent(Int.self, forKey: .calories)
+        proteinG = try container.decodeIfPresent(Double.self, forKey: .proteinG)
+        carbsG = try container.decodeIfPresent(Double.self, forKey: .carbsG)
+        fatG = try container.decodeIfPresent(Double.self, forKey: .fatG)
+        fiberG = try container.decodeIfPresent(Double.self, forKey: .fiberG)
+        foodItems = try container.decodeIfPresent([FoodItem].self, forKey: .foodItems)
+        
         // Handle logged_date
         if let dateString = try container.decodeIfPresent(String.self, forKey: .loggedDate) {
             loggedDate = DateFormatters.dateOnly.date(from: dateString) ?? Date()
@@ -204,6 +226,14 @@ struct UserMealLog: Codable, Identifiable {
         try container.encodeIfPresent(energyLevel, forKey: .energyLevel)
         try container.encode(DateFormatters.dateOnly.string(from: loggedDate), forKey: .loggedDate)
         try container.encodeIfPresent(loggedTime, forKey: .loggedTime)
+        
+        // Nutrition fields
+        try container.encodeIfPresent(calories, forKey: .calories)
+        try container.encodeIfPresent(proteinG, forKey: .proteinG)
+        try container.encodeIfPresent(carbsG, forKey: .carbsG)
+        try container.encodeIfPresent(fatG, forKey: .fatG)
+        try container.encodeIfPresent(fiberG, forKey: .fiberG)
+        try container.encodeIfPresent(foodItems, forKey: .foodItems)
     }
     
     // MARK: - Init
@@ -217,7 +247,13 @@ struct UserMealLog: Codable, Identifiable {
         energyLevel: String? = nil,
         loggedDate: Date = Date(),
         loggedTime: String? = nil,
-        createdAt: Date? = nil
+        createdAt: Date? = nil,
+        calories: Int? = nil,
+        proteinG: Double? = nil,
+        carbsG: Double? = nil,
+        fatG: Double? = nil,
+        fiberG: Double? = nil,
+        foodItems: [FoodItem]? = nil
     ) {
         self.id = id
         self.userId = userId
@@ -229,6 +265,94 @@ struct UserMealLog: Codable, Identifiable {
         self.loggedDate = loggedDate
         self.loggedTime = loggedTime
         self.createdAt = createdAt
+        self.calories = calories
+        self.proteinG = proteinG
+        self.carbsG = carbsG
+        self.fatG = fatG
+        self.fiberG = fiberG
+        self.foodItems = foodItems
+    }
+}
+
+// MARK: - Food Item (for tracking individual foods in a meal)
+struct FoodItem: Codable, Identifiable {
+    var id: String
+    var name: String
+    var calories: Int
+    var proteinG: Double?
+    var carbsG: Double?
+    var fatG: Double?
+    var servingSize: String?
+    var quantity: Double
+    
+    enum CodingKeys: String, CodingKey {
+        case id, name, calories, quantity
+        case proteinG = "protein_g"
+        case carbsG = "carbs_g"
+        case fatG = "fat_g"
+        case servingSize = "serving_size"
+    }
+    
+    init(
+        id: String = UUID().uuidString,
+        name: String,
+        calories: Int,
+        proteinG: Double? = nil,
+        carbsG: Double? = nil,
+        fatG: Double? = nil,
+        servingSize: String? = nil,
+        quantity: Double = 1
+    ) {
+        self.id = id
+        self.name = name
+        self.calories = calories
+        self.proteinG = proteinG
+        self.carbsG = carbsG
+        self.fatG = fatG
+        self.servingSize = servingSize
+        self.quantity = quantity
+    }
+    
+    var totalCalories: Int {
+        Int(Double(calories) * quantity)
+    }
+}
+
+// MARK: - Daily Nutrition Summary
+struct DailyNutritionSummary {
+    var totalCalories: Int = 0
+    var totalProtein: Double = 0
+    var totalCarbs: Double = 0
+    var totalFat: Double = 0
+    var totalFiber: Double = 0
+    
+    var calorieGoal: Int = 2000
+    var proteinGoal: Int = 50
+    var carbsGoal: Int = 250
+    var fatGoal: Int = 65
+    
+    var calorieProgress: Double {
+        guard calorieGoal > 0 else { return 0 }
+        return min(Double(totalCalories) / Double(calorieGoal), 1.0)
+    }
+    
+    var proteinProgress: Double {
+        guard proteinGoal > 0 else { return 0 }
+        return min(totalProtein / Double(proteinGoal), 1.0)
+    }
+    
+    var carbsProgress: Double {
+        guard carbsGoal > 0 else { return 0 }
+        return min(totalCarbs / Double(carbsGoal), 1.0)
+    }
+    
+    var fatProgress: Double {
+        guard fatGoal > 0 else { return 0 }
+        return min(totalFat / Double(fatGoal), 1.0)
+    }
+    
+    var remainingCalories: Int {
+        max(0, calorieGoal - totalCalories)
     }
 }
 
@@ -241,6 +365,22 @@ struct DailyMealSummary {
         meals.values.filter { $0.hasContent }.count
     }
     
+    var totalCalories: Int {
+        meals.values.compactMap { $0.calories }.reduce(0, +)
+    }
+    
+    var totalProtein: Double {
+        meals.values.compactMap { $0.proteinG }.reduce(0, +)
+    }
+    
+    var totalCarbs: Double {
+        meals.values.compactMap { $0.carbsG }.reduce(0, +)
+    }
+    
+    var totalFat: Double {
+        meals.values.compactMap { $0.fatG }.reduce(0, +)
+    }
+    
     var formattedDate: String {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "vi_VN")
@@ -251,5 +391,67 @@ struct DailyMealSummary {
     func meal(for type: MealType) -> UserMealLog? {
         return meals[type]
     }
+}
+
+// MARK: - Common Food Database (Vietnamese foods)
+struct CommonFood {
+    let name: String
+    let calories: Int
+    let proteinG: Double
+    let carbsG: Double
+    let fatG: Double
+    let servingSize: String
+    let category: FoodCategory
+    
+    enum FoodCategory: String, CaseIterable {
+        case rice = "Cơm/Bún/Phở"
+        case meat = "Thịt"
+        case seafood = "Hải sản"
+        case vegetable = "Rau củ"
+        case fruit = "Trái cây"
+        case drink = "Đồ uống"
+        case snack = "Ăn vặt"
+        case other = "Khác"
+    }
+    
+    // Common Vietnamese foods database
+    static let database: [CommonFood] = [
+        // Rice & Noodles
+        CommonFood(name: "Cơm trắng", calories: 130, proteinG: 2.7, carbsG: 28, fatG: 0.3, servingSize: "1 chén (100g)", category: .rice),
+        CommonFood(name: "Phở bò", calories: 350, proteinG: 20, carbsG: 45, fatG: 8, servingSize: "1 tô", category: .rice),
+        CommonFood(name: "Bún bò Huế", calories: 400, proteinG: 25, carbsG: 50, fatG: 10, servingSize: "1 tô", category: .rice),
+        CommonFood(name: "Bánh mì thịt", calories: 350, proteinG: 15, carbsG: 40, fatG: 15, servingSize: "1 ổ", category: .rice),
+        CommonFood(name: "Bún chả", calories: 450, proteinG: 30, carbsG: 45, fatG: 18, servingSize: "1 phần", category: .rice),
+        
+        // Meat
+        CommonFood(name: "Thịt heo nướng", calories: 250, proteinG: 25, carbsG: 2, fatG: 16, servingSize: "100g", category: .meat),
+        CommonFood(name: "Thịt gà luộc", calories: 165, proteinG: 31, carbsG: 0, fatG: 3.6, servingSize: "100g", category: .meat),
+        CommonFood(name: "Thịt bò xào", calories: 200, proteinG: 26, carbsG: 3, fatG: 10, servingSize: "100g", category: .meat),
+        CommonFood(name: "Trứng chiên", calories: 90, proteinG: 6, carbsG: 0.6, fatG: 7, servingSize: "1 quả", category: .meat),
+        
+        // Seafood
+        CommonFood(name: "Cá kho tộ", calories: 180, proteinG: 22, carbsG: 5, fatG: 8, servingSize: "100g", category: .seafood),
+        CommonFood(name: "Tôm hấp", calories: 100, proteinG: 20, carbsG: 1, fatG: 1.5, servingSize: "100g", category: .seafood),
+        
+        // Vegetables
+        CommonFood(name: "Rau muống xào", calories: 50, proteinG: 3, carbsG: 6, fatG: 2, servingSize: "1 đĩa", category: .vegetable),
+        CommonFood(name: "Canh chua", calories: 80, proteinG: 5, carbsG: 10, fatG: 2, servingSize: "1 tô", category: .vegetable),
+        CommonFood(name: "Salad", calories: 50, proteinG: 2, carbsG: 8, fatG: 1, servingSize: "1 đĩa", category: .vegetable),
+        
+        // Fruits
+        CommonFood(name: "Chuối", calories: 90, proteinG: 1.1, carbsG: 23, fatG: 0.3, servingSize: "1 quả", category: .fruit),
+        CommonFood(name: "Táo", calories: 52, proteinG: 0.3, carbsG: 14, fatG: 0.2, servingSize: "1 quả", category: .fruit),
+        CommonFood(name: "Cam", calories: 45, proteinG: 1, carbsG: 11, fatG: 0.1, servingSize: "1 quả", category: .fruit),
+        
+        // Drinks
+        CommonFood(name: "Trà đá", calories: 0, proteinG: 0, carbsG: 0, fatG: 0, servingSize: "1 ly", category: .drink),
+        CommonFood(name: "Cà phê sữa đá", calories: 120, proteinG: 2, carbsG: 20, fatG: 4, servingSize: "1 ly", category: .drink),
+        CommonFood(name: "Sinh tố bơ", calories: 250, proteinG: 4, carbsG: 30, fatG: 14, servingSize: "1 ly", category: .drink),
+        CommonFood(name: "Nước ép cam", calories: 110, proteinG: 1.5, carbsG: 26, fatG: 0.5, servingSize: "1 ly", category: .drink),
+        
+        // Snacks
+        CommonFood(name: "Bánh bao", calories: 200, proteinG: 8, carbsG: 30, fatG: 5, servingSize: "1 cái", category: .snack),
+        CommonFood(name: "Xôi", calories: 180, proteinG: 4, carbsG: 35, fatG: 3, servingSize: "1 gói nhỏ", category: .snack),
+    ]
 }
 
