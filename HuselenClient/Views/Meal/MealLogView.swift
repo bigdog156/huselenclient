@@ -211,39 +211,126 @@ struct MealLogView: View {
         }
     }
     
-    // MARK: - Week Calendar View
+    // MARK: - Month Calendar View
     private var weekCalendarView: some View {
-        HStack(spacing: 0) {
-            ForEach(viewModel.weekDates, id: \.self) { date in
+        VStack(spacing: 8) {
+            // Month header with navigation
+            HStack {
+                // Previous month button
                 Button {
-                    Task {
-                        await viewModel.selectDate(date, userId: userId)
-                    }
+                    viewModel.goToPreviousMonth()
                 } label: {
-                    VStack(spacing: 6) {
-                        Text(viewModel.dayName(for: date))
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(.blue)
+                        .frame(width: 32, height: 32)
+                }
+                
+                Spacer()
+                
+                Text(viewModel.currentMonthYear)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(.primary)
+                
+                Spacer()
+                
+                // Next month button (disabled if current month)
+                Button {
+                    viewModel.goToNextMonth()
+                } label: {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(viewModel.isCurrentMonth ? .gray.opacity(0.4) : .blue)
+                        .frame(width: 32, height: 32)
+                }
+                .disabled(viewModel.isCurrentMonth)
+                
+                // Today button
+                if !viewModel.isCurrentMonth {
+                    Button {
+                        viewModel.goToToday()
+                        Task {
+                            await viewModel.selectDate(Date(), userId: userId)
+                        }
+                    } label: {
+                        Text("Hôm nay")
                             .font(.system(size: 13, weight: .medium))
-                            .foregroundColor(
-                                viewModel.isSelected(date) ? .blue :
-                                    viewModel.isDateToday(date) ? .blue : .secondary
-                            )
-                        
-                        ZStack {
-                            if viewModel.isSelected(date) {
-                                Circle()
-                                    .fill(Color.blue)
-                                    .frame(width: 36, height: 36)
-                            }
-                            
-                            Text(viewModel.dayNumber(for: date))
-                                .font(.system(size: 16, weight: viewModel.isSelected(date) ? .bold : .regular))
-                                .foregroundColor(
-                                    viewModel.isSelected(date) ? .white :
-                                        viewModel.isDateToday(date) ? .blue : .primary
+                            .foregroundColor(.blue)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Color.blue.opacity(0.1))
+                            .cornerRadius(8)
+                    }
+                }
+            }
+            .padding(.horizontal, 16)
+            
+            // Scrollable dates
+            ScrollViewReader { proxy in
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(Array(viewModel.weekDates.enumerated()), id: \.element) { index, date in
+                            Button {
+                                Task {
+                                    await viewModel.selectDate(date, userId: userId)
+                                }
+                            } label: {
+                                VStack(spacing: 6) {
+                                    Text(viewModel.dayName(for: date))
+                                        .font(.system(size: 12, weight: .medium))
+                                        .foregroundColor(
+                                            viewModel.isSelected(date) ? .white :
+                                                viewModel.isDateToday(date) ? .blue : .secondary
+                                        )
+                                    
+                                    Text(viewModel.dayNumber(for: date))
+                                        .font(.system(size: 16, weight: viewModel.isSelected(date) ? .bold : .medium))
+                                        .foregroundColor(
+                                            viewModel.isSelected(date) ? .white :
+                                                viewModel.isDateToday(date) ? .blue : .primary
+                                        )
+                                }
+                                .frame(width: 44, height: 60)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .fill(viewModel.isSelected(date) ? Color.blue : Color.clear)
                                 )
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .stroke(
+                                            viewModel.isDateToday(date) && !viewModel.isSelected(date) ? Color.blue : Color.clear,
+                                            lineWidth: 1.5
+                                        )
+                                )
+                            }
+                            .id(index)
                         }
                     }
-                    .frame(maxWidth: .infinity)
+                    .padding(.horizontal, 16)
+                }
+                .onAppear {
+                    // Auto-scroll to today on first appear
+                    if let todayIndex = viewModel.todayIndex {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                            withAnimation(.easeOut(duration: 0.3)) {
+                                proxy.scrollTo(todayIndex, anchor: .center)
+                            }
+                        }
+                    }
+                }
+                .onChange(of: viewModel.displayedMonth) { _ in
+                    // Scroll to first day when month changes, or to selected date if in this month
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        withAnimation(.easeOut(duration: 0.3)) {
+                            if let selectedIndex = viewModel.selectedDateIndex {
+                                proxy.scrollTo(selectedIndex, anchor: .center)
+                            } else if let todayIndex = viewModel.todayIndex {
+                                proxy.scrollTo(todayIndex, anchor: .center)
+                            } else {
+                                proxy.scrollTo(0, anchor: .leading)
+                            }
+                        }
+                    }
                 }
             }
         }

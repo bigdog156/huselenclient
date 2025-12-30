@@ -132,27 +132,27 @@ struct HomeView: View {
             
             // Other Stats
             HStack(spacing: 12) {
-                // Weight Card
+                // Weight Card - show latest weight with 1 decimal
                 StatCard(
                     icon: "scalemass.fill",
                     iconColor: .blue,
                     iconBgColor: Color.blue.opacity(0.1),
                     title: "Cân nặng",
-                    value: viewModel.todayStats?.weight != nil ? "\(Int(viewModel.todayStats!.weight!)) kg" : "-- kg"
+                    value: viewModel.todayStats?.weight != nil ? String(format: "%.1f kg", viewModel.todayStats!.weight!) : "-- kg"
                 )
                 
-                // Meals Card (meal count instead of calories)
+                // Meals Card - today's meal count
                 StatCard(
                     icon: "fork.knife",
                     iconColor: .orange,
                     iconBgColor: Color.orange.opacity(0.1),
                     title: "Bữa ăn",
-                    value: viewModel.todayStats?.caloriesConsumed != nil ? "\(viewModel.todayStats!.caloriesConsumed!) bữa" : "-- bữa"
+                    value: viewModel.todayStats?.caloriesConsumed != nil ? "\(viewModel.todayStats!.caloriesConsumed!)/4 bữa" : "0/4 bữa"
                 )
                 
                 // Check-in Card
                 StatCard(
-                    icon: "checkmark.circle.fill",
+                    icon: viewModel.hasCheckedInToday ? "checkmark.circle.fill" : "circle",
                     iconColor: viewModel.hasCheckedInToday ? .green : .gray,
                     iconBgColor: viewModel.hasCheckedInToday ? Color.green.opacity(0.1) : Color.gray.opacity(0.1),
                     title: "Check-in",
