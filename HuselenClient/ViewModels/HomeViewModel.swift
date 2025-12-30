@@ -68,18 +68,18 @@ class HomeViewModel: ObservableObject {
         let today = todayDateString()
         
         do {
-            // Fetch today's weight
+            // Fetch latest weight (not just today's - users may not log daily)
             let weightLogs: [WeightLogResponse] = try await supabase
                 .from("user_weight_logs")
                 .select()
                 .eq("user_id", value: userId)
-                .eq("logged_date", value: today)
+                .order("logged_date", ascending: false)
                 .order("created_at", ascending: false)
                 .limit(1)
                 .execute()
                 .value
             
-            let todayWeight = weightLogs.first?.weightKg
+            let latestWeight = weightLogs.first?.weightKg
             
             // Fetch today's meal count
             let mealLogs: [MealLogResponse] = try await supabase
@@ -109,7 +109,7 @@ class HomeViewModel: ObservableObject {
             self.todayStats = DailyStats(
                 userId: userId,
                 date: Date(),
-                weight: todayWeight,
+                weight: latestWeight,
                 caloriesConsumed: mealCount > 0 ? mealCount : nil,
                 mood: todayMood != nil ? Mood(rawValue: todayMood!) : nil
             )
@@ -459,9 +459,7 @@ class HomeViewModel: ObservableObject {
     
     // MARK: - Date Helpers
     private func todayDateString() -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        return formatter.string(from: Date())
+        return DateFormatters.localDateOnly.string(from: Date())
     }
     
     private func todayStartISO() -> String {

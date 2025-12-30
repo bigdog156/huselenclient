@@ -13,6 +13,7 @@ import Supabase
 class MealLogViewModel: ObservableObject {
     // MARK: - Published Properties
     @Published var selectedDate: Date = Date()
+    @Published var displayedMonth: Date = Date()  // The month being displayed in calendar
     @Published var weekDates: [Date] = []
     @Published var mealLogs: [MealType: UserMealLog] = [:]
     @Published var isLoading = false
@@ -43,6 +44,7 @@ class MealLogViewModel: ObservableObject {
     @Published var showAnalysisResult = false
     @Published var mealDescription: String?
     @Published var healthNote: String?
+    @Published var userMealNote: String = ""  // User's custom note about the meal
     
     private let supabase = SupabaseConfig.client
     private let openAIService = OpenAIService.shared
@@ -53,6 +55,13 @@ class MealLogViewModel: ObservableObject {
         formatter.locale = Locale(identifier: "vi_VN")
         formatter.dateFormat = "EEEE, dd/MM"
         return formatter.string(from: selectedDate).capitalized
+    }
+    
+    var currentMonthYear: String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "vi_VN")
+        formatter.dateFormat = "MMMM yyyy"
+        return formatter.string(from: displayedMonth).capitalized
     }
     
     var isToday: Bool {
@@ -91,24 +100,76 @@ class MealLogViewModel: ObservableObject {
         Dictionary(grouping: filteredFoods, by: { $0.category })
     }
     
-    // MARK: - Initialize Week Dates
+    // Index of today in the dates array (for auto-scrolling)
+    var todayIndex: Int? {
+        weekDates.firstIndex { Calendar.current.isDateInToday($0) }
+    }
+    
+    // Index of selected date in the dates array (for scrolling when changing months)
+    var selectedDateIndex: Int? {
+        weekDates.firstIndex { Calendar.current.isDate($0, inSameDayAs: selectedDate) }
+    }
+    
+    // MARK: - Initialize Month Dates
     func initializeWeekDates() {
         let calendar = Calendar.current
         let today = Date()
         
-        // Set selectedDate to start of today for consistent date comparison
+        // Set selectedDate and displayedMonth to start of today
         selectedDate = calendar.startOfDay(for: today)
+        displayedMonth = selectedDate
         
-        // Get the start of the week (Monday)
-        var components = calendar.dateComponents([.yearForWeekOfYear, .weekOfYear], from: today)
-        components.weekday = 2 // Monday
+        // Generate dates for the current month
+        generateDatesForMonth(displayedMonth)
+    }
+    
+    // Generate dates for a specific month
+    func generateDatesForMonth(_ month: Date) {
+        let calendar = Calendar.current
         
-        guard let startOfWeek = calendar.date(from: components) else { return }
+        // Get the start of the month
+        guard let startOfMonth = calendar.date(from: calendar.dateComponents([.year, .month], from: month)) else { return }
         
-        // Generate 7 days
-        weekDates = (0..<7).compactMap { day in
-            calendar.date(byAdding: .day, value: day, to: startOfWeek)
+        // Get the range of days in the month
+        guard let range = calendar.range(of: .day, in: .month, for: month) else { return }
+        
+        // Generate all days of the month
+        weekDates = range.compactMap { day in
+            calendar.date(byAdding: .day, value: day - 1, to: startOfMonth)
         }
+    }
+    
+    // Navigate to previous month
+    func goToPreviousMonth() {
+        let calendar = Calendar.current
+        if let previousMonth = calendar.date(byAdding: .month, value: -1, to: displayedMonth) {
+            displayedMonth = previousMonth
+            generateDatesForMonth(displayedMonth)
+        }
+    }
+    
+    // Navigate to next month
+    func goToNextMonth() {
+        let calendar = Calendar.current
+        if let nextMonth = calendar.date(byAdding: .month, value: 1, to: displayedMonth) {
+            displayedMonth = nextMonth
+            generateDatesForMonth(displayedMonth)
+        }
+    }
+    
+    // Check if displayed month is current month (to potentially disable "next" button)
+    var isCurrentMonth: Bool {
+        let calendar = Calendar.current
+        return calendar.isDate(displayedMonth, equalTo: Date(), toGranularity: .month)
+    }
+    
+    // Go to today and show current month
+    func goToToday() {
+        let calendar = Calendar.current
+        let today = Date()
+        selectedDate = calendar.startOfDay(for: today)
+        displayedMonth = selectedDate
+        generateDatesForMonth(displayedMonth)
     }
     
     // MARK: - Load Meals for Date
@@ -143,13 +204,13 @@ class MealLogViewModel: ObservableObject {
     }
     
     // MARK: - Analyze Meal Image with AI
-    func analyzeMealImage(_ image: UIImage) async -> MealAnalysisResult? {
+    func analyzeMealImage(_ image: UIImage, userContext: String? = nil) async -> MealAnalysisResult? {
         isAnalyzing = true
         analysisError = nil
         analysisResult = nil
         
         do {
-            let result = try await openAIService.analyzeMealImage(image)
+            let result = try await openAIService.analyzeMealImage(image, userContext: userContext)
             
             // Update editing values with AI results
             analysisResult = result
@@ -206,6 +267,7 @@ class MealLogViewModel: ObservableObject {
         showAnalysisResult = false
         mealDescription = nil
         healthNote = nil
+        userMealNote = ""
     }
     
     // MARK: - Save Meal Log
@@ -332,7 +394,15 @@ class MealLogViewModel: ObservableObject {
     
     // MARK: - Select Date
     func selectDate(_ date: Date, userId: String) async {
+        let calendar = Calendar.current
         selectedDate = date
+        
+        // If selected date is in a different month, update displayedMonth and regenerate dates
+        if !calendar.isDate(date, equalTo: displayedMonth, toGranularity: .month) {
+            displayedMonth = date
+            generateDatesForMonth(displayedMonth)
+        }
+        
         await loadMeals(userId: userId, for: date)
         calculateDailyNutrition()
     }
