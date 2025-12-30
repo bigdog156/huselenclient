@@ -549,72 +549,150 @@ struct DinnerSectionView: View {
                     
                     Spacer()
                     
+                    if let log = mealLog, log.hasContent {
+                        Text(log.formattedTime)
+                            .font(.system(size: 14))
+                            .foregroundColor(.secondary)
+                    }
+                    
                     Image(systemName: "chevron.down")
                         .font(.system(size: 14, weight: .medium))
                         .foregroundColor(.secondary)
-                        .rotationEffect(.degrees(isExpanded ? 180 : 0))
+                        .rotationEffect(.degrees(isExpanded || mealLog?.hasContent == true ? 180 : 0))
                 }
             }
             
             // Content (when expanded or has content)
             if isExpanded || mealLog?.hasContent == true {
+                // Content - Locket Style 1:1 Photo
                 if let log = mealLog, let photoUrl = log.photoUrl, let url = URL(string: photoUrl) {
-                    // Photo Card - Locket Style 1:1
+                    // Photo Card - Locket Style
                     LocketStylePhotoCard(
                         url: url,
                         note: log.note,
                         onDelete: onDelete
                     )
-                } else if isExpanded {
-                    // Photo capture button - 1:1 style
+                } else {
+                    // Empty state - Photo capture area (1:1 ratio)
                     Button {
                         onTapPhoto()
                     } label: {
-                        HStack(spacing: 12) {
-                            ZStack {
-                                Circle()
-                                    .stroke(Color(.systemGray4), style: StrokeStyle(lineWidth: 1.5, dash: [6]))
-                                    .frame(width: 50, height: 50)
-                                
-                                Image(systemName: "camera.fill")
-                                    .font(.system(size: 18))
-                                    .foregroundColor(.secondary)
-                                
-                                Circle()
-                                    .fill(Color.blue)
-                                    .frame(width: 18, height: 18)
-                                    .overlay(
-                                        Image(systemName: "plus")
-                                            .font(.system(size: 10, weight: .bold))
-                                            .foregroundColor(.white)
-                                    )
-                                    .offset(x: 18, y: -18)
-                            }
-                            
-                            TextField("Bạn đã ăn gì?", text: $noteText)
-                                .font(.system(size: 15))
-                                .focused($isNoteFocused)
-                            
-                            if !noteText.isEmpty {
-                                Button {
-                                    onSaveNote(noteText)
-                                    noteText = ""
-                                    isNoteFocused = false
-                                } label: {
-                                    Image(systemName: "checkmark.circle.fill")
-                                        .font(.system(size: 28))
-                                        .foregroundColor(.blue)
+                        GeometryReader { geometry in
+                            VStack(spacing: 12) {
+                                ZStack {
+                                    Circle()
+                                        .fill(Color(.systemGray5))
+                                        .frame(width: 56, height: 56)
+                                    
+                                    Image(systemName: "camera.fill")
+                                        .font(.system(size: 22))
+                                        .foregroundColor(.secondary)
+                                    
+                                    // Plus badge
+                                    Circle()
+                                        .fill(Color.blue)
+                                        .frame(width: 20, height: 20)
+                                        .overlay(
+                                            Image(systemName: "plus")
+                                                .font(.system(size: 12, weight: .bold))
+                                                .foregroundColor(.white)
+                                        )
+                                        .offset(x: 20, y: -20)
                                 }
+                                
+                                Text(MealType.dinner.photoPlaceholder)
+                                    .font(.system(size: 14))
+                                    .foregroundColor(.secondary)
                             }
+                            .frame(width: geometry.size.width, height: geometry.size.width) // 1:1 ratio
+                            .background(
+                                RoundedRectangle(cornerRadius: 24)
+                                    .stroke(style: StrokeStyle(lineWidth: 1.5, dash: [8]))
+                                    .foregroundColor(Color(.systemGray4))
+                            )
                         }
-                        .padding(16)
-                        .background(
-                            RoundedRectangle(cornerRadius: 16)
-                                .fill(Color(.systemBackground))
-                        )
+                        .aspectRatio(1, contentMode: .fit)
                     }
                 }
+                
+                // Note Input - Same style as MealSectionView
+                VStack(alignment: .leading, spacing: 8) {
+                    // Show existing note if any (read-only display)
+                    if let log = mealLog, let existingNote = log.note, !existingNote.isEmpty, noteText.isEmpty {
+                        HStack(spacing: 10) {
+                            Image(systemName: "note.text")
+                                .font(.system(size: 14))
+                                .foregroundColor(.blue)
+                            
+                            Text(existingNote)
+                                .font(.system(size: 14))
+                                .foregroundColor(.primary)
+                                .lineLimit(3)
+                            
+                            Spacer()
+                            
+                            Button {
+                                noteText = existingNote
+                                isNoteFocused = true
+                            } label: {
+                                Image(systemName: "pencil.circle.fill")
+                                    .font(.system(size: 20))
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 10)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(Color(.systemGray6))
+                        )
+                    }
+                    
+                    // Note input field
+                    HStack(spacing: 12) {
+                        Image(systemName: "text.alignleft")
+                            .font(.system(size: 16))
+                            .foregroundColor(.secondary)
+                        
+                        TextField("Thêm ghi chú cho bữa ăn...", text: $noteText)
+                            .font(.system(size: 15))
+                            .focused($isNoteFocused)
+                            .onSubmit {
+                                if !noteText.isEmpty {
+                                    onSaveNote(noteText)
+                                    noteText = ""
+                                }
+                            }
+                        
+                        if !noteText.isEmpty {
+                            Button {
+                                onSaveNote(noteText)
+                                noteText = ""
+                                isNoteFocused = false
+                            } label: {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .font(.system(size: 24))
+                                    .foregroundColor(.blue)
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(Color(.systemBackground))
+                            .shadow(color: Color.black.opacity(0.03), radius: 2, x: 0, y: 1)
+                    )
+                }
+                
+                // Calorie display (if meal has calories)
+                if let calories = mealLog?.calories, calories > 0 {
+                    MealCalorieDisplay(mealLog: mealLog)
+                }
             }
+        }
+        .onAppear {
+            noteText = mealLog?.note ?? ""
         }
     }
 }
