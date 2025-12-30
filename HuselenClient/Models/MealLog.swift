@@ -200,7 +200,7 @@ struct UserMealLog: Codable, Identifiable {
         
         // Handle logged_date
         if let dateString = try container.decodeIfPresent(String.self, forKey: .loggedDate) {
-            loggedDate = DateFormatters.dateOnly.date(from: dateString) ?? Date()
+            loggedDate = DateFormatters.localDateOnly.date(from: dateString) ?? Date()
         } else {
             loggedDate = Date()
         }
@@ -224,7 +224,7 @@ struct UserMealLog: Codable, Identifiable {
         try container.encodeIfPresent(note, forKey: .note)
         try container.encodeIfPresent(feeling, forKey: .feeling)
         try container.encodeIfPresent(energyLevel, forKey: .energyLevel)
-        try container.encode(DateFormatters.dateOnly.string(from: loggedDate), forKey: .loggedDate)
+        try container.encode(DateFormatters.localDateOnly.string(from: loggedDate), forKey: .loggedDate)
         try container.encodeIfPresent(loggedTime, forKey: .loggedTime)
         
         // Nutrition fields

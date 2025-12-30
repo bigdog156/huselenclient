@@ -96,6 +96,9 @@ class MealLogViewModel: ObservableObject {
         let calendar = Calendar.current
         let today = Date()
         
+        // Set selectedDate to start of today for consistent date comparison
+        selectedDate = calendar.startOfDay(for: today)
+        
         // Get the start of the week (Monday)
         var components = calendar.dateComponents([.yearForWeekOfYear, .weekOfYear], from: today)
         components.weekday = 2 // Monday
@@ -114,7 +117,7 @@ class MealLogViewModel: ObservableObject {
         isLoading = true
         errorMessage = nil
         
-        let dateString = DateFormatters.dateOnly.string(from: targetDate)
+        let dateString = DateFormatters.localDateOnly.string(from: targetDate)
         
         do {
             let response: [UserMealLog] = try await supabase
@@ -223,14 +226,14 @@ class MealLogViewModel: ObservableObject {
             // Upload photo if exists
             if let photo = photo,
                let imageData = photo.jpegData(compressionQuality: 0.7) {
-                let dateString = DateFormatters.dateOnly.string(from: selectedDate)
+                let dateString = DateFormatters.localDateOnly.string(from: selectedDate)
                 let fileName = "\(userId)/\(dateString)_\(mealType.rawValue)_\(Date().timeIntervalSince1970).jpg"
                 
                 try await supabase.storage
                     .from("meal-photos")
                     .upload(
-                        path: fileName,
-                        file: imageData,
+                        fileName,
+                        data: imageData,
                         options: FileOptions(contentType: "image/jpeg")
                     )
                 
@@ -331,6 +334,7 @@ class MealLogViewModel: ObservableObject {
     func selectDate(_ date: Date, userId: String) async {
         selectedDate = date
         await loadMeals(userId: userId, for: date)
+        calculateDailyNutrition()
     }
     
     // MARK: - Start Editing
@@ -476,7 +480,7 @@ class MealLogViewModel: ObservableObject {
             // Upload photo if exists
             if let photo = photo,
                let imageData = photo.jpegData(compressionQuality: 0.7) {
-                let dateString = DateFormatters.dateOnly.string(from: selectedDate)
+                let dateString = DateFormatters.localDateOnly.string(from: selectedDate)
                 let fileName = "\(userId)/\(dateString)_\(mealType.rawValue)_\(Date().timeIntervalSince1970).jpg"
                 
                 try await supabase.storage

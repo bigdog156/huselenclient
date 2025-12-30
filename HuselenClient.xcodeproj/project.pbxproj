@@ -413,6 +413,8 @@
 		};
 		5828C4D52EF2639B00F0FCDA /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReferenceAnchor = 5828C4B12EF2639900F0FCDA /* HuselenClient */;
+			baseConfigurationReferenceRelativePath = Config/DEV.xcconfig;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -455,7 +457,7 @@
 		5828C4D62EF2639B00F0FCDA /* Release */ = {
 			isa = XCBuildConfiguration;
 			baseConfigurationReferenceAnchor = 5828C4B12EF2639900F0FCDA /* HuselenClient */;
-			baseConfigurationReferenceRelativePath = Config/Prod.xcconfig;
+			baseConfigurationReferenceRelativePath = Config/PROD.xcconfig;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;

@@ -30,7 +30,11 @@ struct MealLogView: View {
                 ScrollView {
                     VStack(spacing: 24) {
                         // Daily Nutrition Summary
-                        DailyNutritionSummaryView(nutrition: viewModel.dailyNutrition)
+                        DailyNutritionSummaryView(
+                            nutrition: viewModel.dailyNutrition,
+                            selectedDate: viewModel.selectedDate,
+                            isToday: viewModel.isToday
+                        )
                         
                         // Main meals (Sáng, Trưa, Chiều)
                         ForEach([MealType.breakfast, MealType.lunch, MealType.afternoon], id: \.self) { mealType in
@@ -1173,13 +1177,26 @@ class MealCameraPreviewUIView: UIView {
 // MARK: - Daily Nutrition Summary View
 struct DailyNutritionSummaryView: View {
     let nutrition: DailyNutritionSummary
+    let selectedDate: Date
+    let isToday: Bool
+    
+    private var dateLabel: String {
+        if isToday {
+            return "Tổng calo hôm nay"
+        } else {
+            let formatter = DateFormatter()
+            formatter.locale = Locale(identifier: "vi_VN")
+            formatter.dateFormat = "dd/MM"
+            return "Tổng calo ngày \(formatter.string(from: selectedDate))"
+        }
+    }
     
     var body: some View {
         VStack(spacing: 16) {
             // Header
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Tổng calo hôm nay")
+                    Text(dateLabel)
                         .font(.system(size: 13, weight: .medium))
                         .foregroundColor(.secondary)
                     
