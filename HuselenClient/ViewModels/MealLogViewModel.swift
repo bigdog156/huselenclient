@@ -43,6 +43,7 @@ class MealLogViewModel: ObservableObject {
     @Published var showAnalysisResult = false
     @Published var mealDescription: String?
     @Published var healthNote: String?
+    @Published var userMealNote: String = ""  // User's custom note about the meal
     
     private let supabase = SupabaseConfig.client
     private let openAIService = OpenAIService.shared
@@ -143,13 +144,13 @@ class MealLogViewModel: ObservableObject {
     }
     
     // MARK: - Analyze Meal Image with AI
-    func analyzeMealImage(_ image: UIImage) async -> MealAnalysisResult? {
+    func analyzeMealImage(_ image: UIImage, userContext: String? = nil) async -> MealAnalysisResult? {
         isAnalyzing = true
         analysisError = nil
         analysisResult = nil
         
         do {
-            let result = try await openAIService.analyzeMealImage(image)
+            let result = try await openAIService.analyzeMealImage(image, userContext: userContext)
             
             // Update editing values with AI results
             analysisResult = result
@@ -206,6 +207,7 @@ class MealLogViewModel: ObservableObject {
         showAnalysisResult = false
         mealDescription = nil
         healthNote = nil
+        userMealNote = ""
     }
     
     // MARK: - Save Meal Log

@@ -21,7 +21,7 @@ class OpenAIService {
     private init() {}
     
     // MARK: - Analyze Meal Image
-    func analyzeMealImage(_ image: UIImage) async throws -> MealAnalysisResult {
+    func analyzeMealImage(_ image: UIImage, userContext: String? = nil) async throws -> MealAnalysisResult {
         guard !apiKey.isEmpty else {
             throw OpenAIError.missingAPIKey
         }
@@ -33,7 +33,7 @@ class OpenAIService {
         let base64Image = imageData.base64EncodedString()
         
         // Build request
-        let request = try buildRequest(base64Image: base64Image)
+        let request = try buildRequest(base64Image: base64Image, userContext: userContext)
         
         // Make API call
         let (data, response) = try await URLSession.shared.data(for: request)
@@ -61,7 +61,7 @@ class OpenAIService {
     }
     
     // MARK: - Build Request
-    private func buildRequest(base64Image: String) throws -> URLRequest {
+    private func buildRequest(base64Image: String, userContext: String? = nil) throws -> URLRequest {
         guard let url = URL(string: baseURL) else {
             throw OpenAIError.invalidURL
         }
@@ -72,8 +72,20 @@ class OpenAIService {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.timeoutInterval = 30
         
+        // Build user context section if provided
+        let userContextSection: String
+        if let context = userContext, !context.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            userContextSection = """
+            
+            User's description of this meal: "\(context)"
+            Use this information to better identify the foods and provide more accurate nutritional estimates.
+            """
+        } else {
+            userContextSection = ""
+        }
+        
         let prompt = """
-        Analyze this meal image and estimate the nutritional content. 
+        Analyze this meal image and estimate the nutritional content.\(userContextSection)
         
         Respond ONLY with a valid JSON object in this exact format (no markdown, no code blocks):
         {

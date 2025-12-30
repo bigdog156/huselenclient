@@ -128,11 +128,8 @@ struct MealLogView: View {
                         pendingMealType = selectedMealType
                         captureForMealType = nil
                         
-                        // Start AI analysis
-                        Task {
-                            await viewModel.analyzeMealImage(image)
-                            showAnalysisSheet = true
-                        }
+                        // Show analysis sheet first, let user add note before analysis
+                        showAnalysisSheet = true
                     },
                     onDismiss: {
                         captureForMealType = nil
@@ -147,11 +144,26 @@ struct MealLogView: View {
                     onSave: {
                         Task {
                             if let mealType = pendingMealType {
+                                // Combine user note with AI description
+                                let combinedNote: String? = {
+                                    let userNote = viewModel.userMealNote.trimmingCharacters(in: .whitespacesAndNewlines)
+                                    let aiDescription = viewModel.mealDescription ?? ""
+                                    
+                                    if !userNote.isEmpty && !aiDescription.isEmpty {
+                                        return "\(userNote)\n\n\(aiDescription)"
+                                    } else if !userNote.isEmpty {
+                                        return userNote
+                                    } else if !aiDescription.isEmpty {
+                                        return aiDescription
+                                    }
+                                    return nil
+                                }()
+                                
                                 await viewModel.saveMealWithNutrition(
                                     userId: userId,
                                     mealType: mealType,
                                     photo: capturedImage,
-                                    note: viewModel.mealDescription,
+                                    note: combinedNote,
                                     feeling: nil,
                                     calories: viewModel.editingCalories > 0 ? viewModel.editingCalories : nil,
                                     proteinG: viewModel.editingProtein > 0 ? viewModel.editingProtein : nil,
@@ -1669,6 +1681,8 @@ struct MealAnalysisResultSheet: View {
     let onSave: () -> Void
     let onDismiss: () -> Void
     
+    @FocusState private var isNoteFocused: Bool
+    
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -1678,14 +1692,72 @@ struct MealAnalysisResultSheet: View {
                         Image(uiImage: image)
                             .resizable()
                             .aspectRatio(contentMode: .fill)
-                            .frame(height: 200)
                             .clipped()
                             .cornerRadius(16)
                             .padding(.horizontal, 16)
                     }
                     
+                    // User Note Input - Always visible
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Ghi chú của bạn")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(.secondary)
+                        
+                        TextField("Thêm mô tả về bữa ăn của bạn...", text: $viewModel.userMealNote, axis: .vertical)
+                            .font(.system(size: 15))
+                            .lineLimit(3...6)
+                            .padding(12)
+                            .background(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(Color(.systemGray4), lineWidth: 1)
+                            )
+                            .focused($isNoteFocused)
+                    }
+                    .padding(.horizontal, 16)
+                    
+                    // Not yet analyzed state - show analyze button
+                    if !viewModel.isAnalyzing && viewModel.analysisResult == nil && viewModel.analysisError == nil {
+                        VStack(spacing: 16) {
+                            Image(systemName: "sparkles")
+                                .font(.system(size: 40))
+                                .foregroundColor(.blue)
+                            
+                            Text("Phân tích dinh dưỡng bằng AI")
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundColor(.primary)
+                            
+                            Text("Thêm mô tả để AI nhận diện chính xác hơn")
+                                .font(.system(size: 14))
+                                .foregroundColor(.secondary)
+                                .multilineTextAlignment(.center)
+                            
+                            Button {
+                                isNoteFocused = false
+                                if let image = image {
+                                    Task {
+                                        let context = viewModel.userMealNote.isEmpty ? nil : viewModel.userMealNote
+                                        await viewModel.analyzeMealImage(image, userContext: context)
+                                    }
+                                }
+                            } label: {
+                                HStack {
+                                    Image(systemName: "wand.and.stars")
+                                    Text("Phân tích ngay")
+                                }
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundColor(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 14)
+                                .background(Color.blue)
+                                .cornerRadius(12)
+                            }
+                            .padding(.horizontal, 16)
+                        }
+                        .padding(.vertical, 20)
+                    }
+                    
                     // Loading State
-                    if viewModel.isAnalyzing {
+                    else if viewModel.isAnalyzing {
                         VStack(spacing: 16) {
                             ProgressView()
                                 .scaleEffect(1.5)
@@ -1720,7 +1792,8 @@ struct MealAnalysisResultSheet: View {
                             Button {
                                 if let image = image {
                                     Task {
-                                        await viewModel.analyzeMealImage(image)
+                                        let context = viewModel.userMealNote.isEmpty ? nil : viewModel.userMealNote
+                                        await viewModel.analyzeMealImage(image, userContext: context)
                                     }
                                 }
                             } label: {
@@ -1823,21 +1896,43 @@ struct MealAnalysisResultSheet: View {
                 }
             }
             .safeAreaInset(edge: .bottom) {
-                if !viewModel.isAnalyzing && viewModel.analysisResult != nil {
+                if !viewModel.isAnalyzing {
                     VStack(spacing: 12) {
-                        Button {
-                            onSave()
-                        } label: {
-                            HStack {
-                                Image(systemName: "checkmark.circle.fill")
-                                Text("Lưu bữa ăn")
+                        // Show save button with analysis results
+                        if viewModel.analysisResult != nil {
+                            Button {
+                                onSave()
+                            } label: {
+                                HStack {
+                                    Image(systemName: "checkmark.circle.fill")
+                                    Text("Lưu bữa ăn")
+                                }
+                                .font(.system(size: 17, weight: .semibold))
+                                .foregroundColor(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 16)
+                                .background(Color.blue)
+                                .cornerRadius(14)
                             }
-                            .font(.system(size: 17, weight: .semibold))
-                            .foregroundColor(.white)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 16)
-                            .background(Color.blue)
-                            .cornerRadius(14)
+                        }
+                        // Show save without analysis option when not yet analyzed
+                        else if viewModel.analysisResult == nil && viewModel.analysisError == nil {
+                            Button {
+                                onSave()
+                            } label: {
+                                HStack {
+                                    Image(systemName: "photo.badge.checkmark")
+                                    Text("Lưu chỉ với ảnh")
+                                }
+                                .font(.system(size: 15, weight: .medium))
+                                .foregroundColor(.blue)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 14)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .stroke(Color.blue, lineWidth: 1.5)
+                                )
+                            }
                         }
                         
                         Button {
